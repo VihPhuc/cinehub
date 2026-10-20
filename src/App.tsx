@@ -9,7 +9,7 @@ import {
 } from './services/api';
 import type { MovieDetail, MovieItem, FavoriteItem, HistoryItem } from './types';
 import { getFavorites, getHistory, toggleFavorite, clearHistory, removeHistoryItem } from './services/storage';
-import { ArrowUp } from 'lucide-react';
+import { ArrowUp, WifiOff } from 'lucide-react';
 import { Navbar } from './components/Navbar';
 import { HeroBanner } from './components/HeroBanner';
 import { MovieRow } from './components/MovieRow';
@@ -44,6 +44,18 @@ export function App() {
   const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -262,6 +274,12 @@ export function App() {
 
   return (
     <div className="min-h-screen bg-[#0f1015] text-zinc-100 flex flex-col font-sans">
+      {isOffline && (
+        <div className="bg-amber-500 text-zinc-950 font-bold text-xs py-1.5 px-4 text-center flex items-center justify-center gap-2 sticky top-0 z-50 shadow-md">
+          <WifiOff className="w-3.5 h-3.5 shrink-0" />
+          <span>Bạn đang ở chế độ ngoại tuyến. Bạn vẫn có thể xem danh sách Phim Đã Lưu và Lịch Sử.</span>
+        </div>
+      )}
       <Navbar
         activeTab={activeTab}
         onSelectTab={(tab) => {
