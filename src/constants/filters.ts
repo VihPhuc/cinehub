@@ -1,0 +1,45 @@
+export const GENRES = [
+  { name: 'Hành Động', slug: 'hanh-dong' },
+  { name: 'Võ Thuật', slug: 'vo-thuat' },
+  { name: 'Cổ Trang', slug: 'co-trang' },
+  { name: 'Viễn Tưởng', slug: 'vien-tuong' },
+  { name: 'Hoạt Hình', slug: 'hoat-hinh' },
+  { name: 'Kinh Dị', slug: 'kinh-di' },
+  { name: 'Tình Cảm', slug: 'tinh-cam' },
+  { name: 'Hài Hước', slug: 'hai-huoc' },
+  { name: 'Phiêu Lưu', slug: 'phieu-luu' },
+  { name: 'Tâm Lý', slug: 'tam-ly' },
+  { name: 'Hình Sự', slug: 'hinh-su' },
+  { name: 'Chiến Tranh', slug: 'chien-tranh' },
+  { name: 'Bí Ẩn', slug: 'bi-an' },
+  { name: 'Học Đường', slug: 'hoc-duong' },
+  { name: 'Khoa Học', slug: 'khoa-hoc' },
+  { name: 'Thần Thoại', slug: 'than-thoai' },
+  { name: 'Tài Liệu', slug: 'tai-lieu' },
+  { name: 'Gia Đình', slug: 'gia-dinh' },
+];
+
+export const COUNTRIES = [
+  { name: 'Trung Quốc', slug: 'trung-quoc' },
+  { name: 'Hàn Quốc', slug: 'han-quoc' },
+  { name: 'Âu Mỹ', slug: 'au-my' },
+  { name: 'Nhật Bản', slug: 'nhat-ban' },
+  { name: 'Thái Lan', slug: 'thai-lan' },
+  { name: 'Việt Nam', slug: 'viet-nam' },
+  { name: 'Hồng Kông', slug: 'hong-kong' },
+  { name: 'Đài Loan', slug: 'dai-loan' },
+  { name: 'Ấn Độ', slug: 'an-do' },
+  { name: 'Anh', slug: 'anh' },
+  { name: 'Pháp', slug: 'phap' },
+];
+
+export const NAV_TABS = [
+  { id: 'home', label: 'Trang Chủ' },
+  { id: 'phim-le', label: 'Phim Lẻ' },
+  { id: 'phim-bo', label: 'Phim Bộ' },
+  { id: 'hoat-hinh', label: 'Anime / Hoạt Hình' },
+  { id: 'tv-shows', label: 'TV Shows' },
+  { id: 'genres', label: 'Thể Loại' },
+  { id: 'countries', label: 'Quốc Gia' },
+  { id: 'library', label: 'Tủ Phim' },
+];

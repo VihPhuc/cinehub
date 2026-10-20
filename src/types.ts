@@ -1,0 +1,88 @@
+export interface MovieCategory {
+  id?: string;
+  name: string;
+  slug: string;
+}
+
+export interface MovieCountry {
+  id?: string;
+  name: string;
+  slug: string;
+}
+
+export interface MovieTMDB {
+  id?: string | number | null;
+  type?: 'movie' | 'tv' | null;
+  season?: number | null;
+  vote_average?: number;
+  vote_count?: number;
+}
+
+export interface MovieItem {
+  _id?: string;
+  name: string;
+  slug: string;
+  origin_name?: string;
+  thumb_url?: string;
+  poster_url?: string;
+  year?: number;
+  time?: string;
+  episode_current?: string;
+  quality?: string;
+  lang?: string;
+  chieurap?: boolean;
+  tmdb?: MovieTMDB;
+  category?: MovieCategory[];
+  country?: MovieCountry[];
+}
+
+export interface EpisodeItem {
+  name: string;
+  slug: string;
+  filename?: string;
+  link_embed: string;
+  link_m3u8: string;
+}
+
+export interface EpisodeServer {
+  server_name: string;
+  server_data: EpisodeItem[];
+}
+
+export interface MovieDetail extends MovieItem {
+  content?: string;
+  type?: string;
+  status?: string;
+  trailer_url?: string;
+  episode_total?: string | number;
+  view?: number;
+  actor?: string[];
+  director?: string[];
+  episodes?: EpisodeServer[];
+}
+
+export interface HistoryItem {
+  slug: string;
+  name: string;
+  origin_name?: string;
+  poster_url?: string;
+  thumb_url?: string;
+  serverName: string;
+  episodeSlug: string;
+  episodeName: string;
+  currentTime: number;
+  duration: number;
+  updatedAt: number;
+}
+
+export interface FavoriteItem {
+  slug: string;
+  name: string;
+  origin_name?: string;
+  poster_url?: string;
+  thumb_url?: string;
+  year?: number;
+  quality?: string;
+  lang?: string;
+  savedAt: number;
+}
