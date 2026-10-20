@@ -14,72 +14,73 @@ export function getImageUrl(url?: string): string {
   return `${IMAGE_CDN}/${cleanPath}`;
 }
 
-export async function getNewUpdatedMovies(page = 1): Promise<{ items: MovieItem[]; totalPages: number }> {
-  try {
-    const res = await fetch(`${BASE_URL}/danh-sach/phim-moi-cap-nhat?page=${page}`);
-    const data = await res.json();
-    return {
-      items: data.items || [],
-      totalPages: data.pagination?.totalPages || 1,
-    };
-  } catch (err) {
-    console.error('Failed to fetch new movies:', err);
-    return { items: [], totalPages: 1 };
+const apiCache = new Map<string, { data: any; expiry: number }>();
+const CACHE_TTL_MS = 4 * 60 * 1000; // 4 minutes cache
+
+async function fetchWithCache<T>(url: string, ttl = CACHE_TTL_MS): Promise<T | null> {
+  const now = Date.now();
+  const cached = apiCache.get(url);
+  if (cached && cached.expiry > now) {
+    return cached.data as T;
   }
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return cached ? (cached.data as T) : null;
+    const data = await res.json();
+    apiCache.set(url, { data, expiry: now + ttl });
+    return data as T;
+  } catch (err) {
+    console.error(`Fetch failed for ${url}:`, err);
+    return cached ? (cached.data as T) : null;
+  }
+}
+
+export async function getNewUpdatedMovies(page = 1): Promise<{ items: MovieItem[]; totalPages: number }> {
+  const data = await fetchWithCache<any>(`${BASE_URL}/danh-sach/phim-moi-cap-nhat?page=${page}`, 2 * 60 * 1000);
+  if (!data) return { items: [], totalPages: 1 };
+  return {
+    items: data.items || [],
+    totalPages: data.pagination?.totalPages || 1,
+  };
 }
 
 export async function getCatalogMovies(
   type: 'phim-le' | 'phim-bo' | 'hoat-hinh' | 'tv-shows',
   page = 1
 ): Promise<{ items: MovieItem[]; title: string; totalPages: number }> {
-  try {
-    const res = await fetch(`${BASE_URL}/v1/api/danh-sach/${type}?page=${page}`);
-    const data = await res.json();
-    return {
-      items: data.data?.items || [],
-      title: data.data?.titlePage || '',
-      totalPages: data.data?.params?.pagination?.totalPages || 1,
-    };
-  } catch (err) {
-    console.error(`Failed to fetch catalog ${type}:`, err);
-    return { items: [], title: '', totalPages: 1 };
-  }
+  const data = await fetchWithCache<any>(`${BASE_URL}/v1/api/danh-sach/${type}?page=${page}`);
+  if (!data) return { items: [], title: '', totalPages: 1 };
+  return {
+    items: data.data?.items || [],
+    title: data.data?.titlePage || '',
+    totalPages: data.data?.params?.pagination?.totalPages || 1,
+  };
 }
 
 export async function getGenreMovies(
   slug: string,
   page = 1
 ): Promise<{ items: MovieItem[]; title: string; totalPages: number }> {
-  try {
-    const res = await fetch(`${BASE_URL}/v1/api/the-loai/${slug}?page=${page}`);
-    const data = await res.json();
-    return {
-      items: data.data?.items || [],
-      title: data.data?.titlePage || 'Thể Loại',
-      totalPages: data.data?.params?.pagination?.totalPages || 1,
-    };
-  } catch (err) {
-    console.error(`Failed to fetch genre ${slug}:`, err);
-    return { items: [], title: '', totalPages: 1 };
-  }
+  const data = await fetchWithCache<any>(`${BASE_URL}/v1/api/the-loai/${slug}?page=${page}`);
+  if (!data) return { items: [], title: '', totalPages: 1 };
+  return {
+    items: data.data?.items || [],
+    title: data.data?.titlePage || 'Thể Loại',
+    totalPages: data.data?.params?.pagination?.totalPages || 1,
+  };
 }
 
 export async function getCountryMovies(
   slug: string,
   page = 1
 ): Promise<{ items: MovieItem[]; title: string; totalPages: number }> {
-  try {
-    const res = await fetch(`${BASE_URL}/v1/api/quoc-gia/${slug}?page=${page}`);
-    const data = await res.json();
-    return {
-      items: data.data?.items || [],
-      title: data.data?.titlePage || 'Quốc Gia',
-      totalPages: data.data?.params?.pagination?.totalPages || 1,
-    };
-  } catch (err) {
-    console.error(`Failed to fetch country ${slug}:`, err);
-    return { items: [], title: '', totalPages: 1 };
-  }
+  const data = await fetchWithCache<any>(`${BASE_URL}/v1/api/quoc-gia/${slug}?page=${page}`);
+  if (!data) return { items: [], title: '', totalPages: 1 };
+  return {
+    items: data.data?.items || [],
+    title: data.data?.titlePage || 'Quốc Gia',
+    totalPages: data.data?.params?.pagination?.totalPages || 1,
+  };
 }
 
 export async function searchMovies(
@@ -87,24 +88,21 @@ export async function searchMovies(
   page = 1
 ): Promise<{ items: MovieItem[]; totalPages: number }> {
   if (!keyword.trim()) return { items: [], totalPages: 1 };
-  try {
-    const res = await fetch(`${BASE_URL}/v1/api/tim-kiem?keyword=${encodeURIComponent(keyword)}&page=${page}`);
-    const data = await res.json();
-    return {
-      items: data.data?.items || [],
-      totalPages: data.data?.params?.pagination?.totalPages || 1,
-    };
-  } catch (err) {
-    console.error('Failed to search movies:', err);
-    return { items: [], totalPages: 1 };
-  }
+  const data = await fetchWithCache<any>(
+    `${BASE_URL}/v1/api/tim-kiem?keyword=${encodeURIComponent(keyword)}&page=${page}`,
+    60 * 1000
+  );
+  if (!data) return { items: [], totalPages: 1 };
+  return {
+    items: data.data?.items || [],
+    totalPages: data.data?.params?.pagination?.totalPages || 1,
+  };
 }
 
 export async function getMovieDetail(slug: string): Promise<MovieDetail | null> {
   try {
-    const res = await fetch(`${BASE_URL}/phim/${slug}`);
-    const data = await res.json();
-    if (!data.status || !data.movie) return null;
+    const data = await fetchWithCache<any>(`${BASE_URL}/phim/${slug}`, 5 * 60 * 1000);
+    if (!data || !data.status || !data.movie) return null;
 
     const movie: MovieDetail = {
       ...data.movie,

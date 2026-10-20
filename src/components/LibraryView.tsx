@@ -73,35 +73,42 @@ export const LibraryView: React.FC<Props> = ({
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 w-full">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-zinc-800 pb-4 mb-6 gap-3">
+      {/* Header and Controls */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/[0.08] pb-5 mb-8 gap-4">
         <div className="flex items-center gap-2 sm:gap-3">
           <button
             onClick={() => setTab('favorites')}
-            className={`flex items-center gap-2 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs sm:text-sm font-bold cursor-pointer transition-colors ${
-              tab === 'favorites' ? 'bg-red-600 text-white' : 'bg-zinc-900 text-zinc-400 hover:text-white'
+            className={`flex items-center gap-2 px-4 py-2 sm:px-5 sm:py-2.5 rounded-2xl text-xs sm:text-sm font-black font-heading cursor-pointer transition-all ${
+              tab === 'favorites'
+                ? 'bg-gradient-to-r from-red-600 to-rose-600 text-white shadow-lg shadow-red-600/30 glow-red-sm scale-105'
+                : 'glass-pill text-zinc-300 hover:text-white hover:bg-white/10'
             }`}
           >
-            <Bookmark className="w-4 h-4" /> Đã Lưu ({favorites.length})
+            <Bookmark className={`w-4 h-4 ${tab === 'favorites' ? 'fill-current' : ''}`} />
+            Đã Lưu ({favorites.length})
           </button>
           <button
             onClick={() => setTab('history')}
-            className={`flex items-center gap-2 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs sm:text-sm font-bold cursor-pointer transition-colors ${
-              tab === 'history' ? 'bg-red-600 text-white' : 'bg-zinc-900 text-zinc-400 hover:text-white'
+            className={`flex items-center gap-2 px-4 py-2 sm:px-5 sm:py-2.5 rounded-2xl text-xs sm:text-sm font-black font-heading cursor-pointer transition-all ${
+              tab === 'history'
+                ? 'bg-gradient-to-r from-red-600 to-rose-600 text-white shadow-lg shadow-red-600/30 glow-red-sm scale-105'
+                : 'glass-pill text-zinc-300 hover:text-white hover:bg-white/10'
             }`}
           >
-            <History className="w-4 h-4" /> Đang Xem ({history.length})
+            <History className="w-4 h-4" />
+            Đang Xem ({history.length})
           </button>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap">
           <div className="relative">
-            <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+            <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={filterQuery}
               onChange={(e) => setFilterQuery(e.target.value)}
-              placeholder="Lọc tên phim..."
-              className="pl-8 pr-3 py-1.5 bg-zinc-900 border border-zinc-800 rounded-lg text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-red-500 w-36 sm:w-44"
+              placeholder="Lọc trong tủ phim..."
+              className="pl-9 pr-3 py-2 bg-white/[0.06] border border-white/[0.1] rounded-xl text-xs sm:text-sm text-white placeholder-zinc-400 focus:outline-none focus:border-red-500 w-40 sm:w-52 transition-all"
             />
           </div>
 
@@ -114,7 +121,7 @@ export const LibraryView: React.FC<Props> = ({
           />
           <button
             onClick={handleExport}
-            className="flex items-center gap-1.5 text-xs text-zinc-300 hover:text-white px-2.5 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-zinc-700 cursor-pointer transition-colors"
+            className="flex items-center gap-1.5 text-xs font-bold text-zinc-300 hover:text-white px-3 py-2 rounded-xl glass-pill hover:bg-white/15 cursor-pointer transition-all border border-white/10"
             title="Tải file sao lưu JSON về máy"
           >
             <Download className="w-3.5 h-3.5 text-zinc-400" />
@@ -122,7 +129,7 @@ export const LibraryView: React.FC<Props> = ({
           </button>
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-1.5 text-xs text-zinc-300 hover:text-white px-2.5 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-zinc-700 cursor-pointer transition-colors"
+            className="flex items-center gap-1.5 text-xs font-bold text-zinc-300 hover:text-white px-3 py-2 rounded-xl glass-pill hover:bg-white/15 cursor-pointer transition-all border border-white/10"
             title="Khôi phục danh sách từ file JSON"
           >
             <Upload className="w-3.5 h-3.5 text-zinc-400" />
@@ -131,7 +138,7 @@ export const LibraryView: React.FC<Props> = ({
           {tab === 'history' && history.length > 0 && (
             <button
               onClick={onClearHistory}
-              className="flex items-center gap-1 text-xs text-zinc-400 hover:text-red-400 px-2.5 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 cursor-pointer transition-colors"
+              className="flex items-center gap-1.5 text-xs font-bold text-zinc-400 hover:text-red-400 px-3 py-2 rounded-xl glass-pill hover:bg-red-500/10 cursor-pointer transition-all border border-white/10"
             >
               <Trash2 className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Xóa tất cả</span>
@@ -140,74 +147,128 @@ export const LibraryView: React.FC<Props> = ({
         </div>
       </div>
 
+      {/* Tab Contents */}
       {tab === 'favorites' ? (
         filteredFavs.length === 0 ? (
-          <div className="h-48 flex items-center justify-center text-zinc-500 text-sm">
-            {filterQuery ? 'Không tìm thấy phim phù hợp với từ khóa.' : 'Chưa có phim lưu trong tủ.'}
+          <div className="py-20 flex flex-col items-center justify-center text-center max-w-sm mx-auto glass-panel rounded-3xl p-8 space-y-3">
+            <div className="w-14 h-14 rounded-2xl bg-white/[0.05] border border-white/[0.08] flex items-center justify-center text-zinc-400">
+              <Bookmark className="w-6 h-6" />
+            </div>
+            <p className="text-base font-bold text-zinc-200">
+              {filterQuery ? 'Không tìm thấy phim phù hợp.' : 'Chưa có phim nào trong Tủ Phim.'}
+            </p>
+            <span className="text-xs text-zinc-400">
+              Bấm vào biểu tượng bookmark trên thẻ phim để lưu lại và xem sau bất cứ lúc nào.
+            </span>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3.5 sm:gap-4.5">
             {filteredFavs.map((m) => (
               <div
                 key={m.slug}
                 onClick={() => onSelectMovie(m.slug)}
-                className="group relative rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800 cursor-pointer"
+                className="group relative rounded-2xl overflow-hidden bg-white/[0.03] border border-white/[0.08] hover:border-red-500/50 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-red-600/20 cursor-pointer"
               >
-                <div className="aspect-[2/3] w-full bg-zinc-950 relative">
-                  <img src={getImageUrl(m.poster_url || m.thumb_url)} alt={m.name} className="w-full h-full object-cover" />
+                <div className="aspect-[2/3] w-full bg-[#11131c] relative overflow-hidden">
+                  <img
+                    src={getImageUrl(m.poster_url || m.thumb_url)}
+                    alt={m.name}
+                    className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-500"
+                  />
                   <button
-                    onClick={(e) => { e.stopPropagation(); onRemoveFav(m.slug); }}
-                    className="absolute top-2 right-2 p-1.5 rounded-full bg-black/70 hover:bg-red-600 text-white"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRemoveFav(m.slug);
+                    }}
+                    className="absolute top-2.5 right-2.5 p-2 rounded-full bg-black/75 hover:bg-red-600 text-white transition-all cursor-pointer z-10 hover:scale-110 shadow-lg"
+                    title="Bỏ lưu phim này"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#090a0f] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <div className="w-11 h-11 rounded-full bg-red-600 text-white flex items-center justify-center shadow-lg shadow-red-600/40 glow-red-sm">
+                      <Play className="w-4 h-4 fill-current translate-x-0.5" />
+                    </div>
+                  </div>
                 </div>
-                <div className="p-2">
-                  <h4 className="text-xs font-semibold truncate text-zinc-200">{m.name}</h4>
-                  <span className="text-[10px] text-zinc-500">{m.year || '2026'}</span>
+                <div className="p-2.5 bg-[#0e1017]/70">
+                  <h4 className="text-xs font-bold truncate text-zinc-100 group-hover:text-red-400 transition-colors">
+                    {m.name}
+                  </h4>
+                  <div className="flex items-center justify-between text-[10px] text-zinc-400 mt-1">
+                    <span>{m.year || '2026'}</span>
+                    {m.quality && (
+                      <span className="px-1.5 py-0.2 rounded bg-red-600/80 text-white font-bold">
+                        {m.quality}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
           </div>
         )
       ) : filteredHistory.length === 0 ? (
-        <div className="h-48 flex items-center justify-center text-zinc-500 text-sm">
-          {filterQuery ? 'Không tìm thấy lịch sử phù hợp với từ khóa.' : 'Chưa có lịch sử xem phim.'}
+        <div className="py-20 flex flex-col items-center justify-center text-center max-w-sm mx-auto glass-panel rounded-3xl p-8 space-y-3">
+          <div className="w-14 h-14 rounded-2xl bg-white/[0.05] border border-white/[0.08] flex items-center justify-center text-zinc-400">
+            <History className="w-6 h-6" />
+          </div>
+          <p className="text-base font-bold text-zinc-200">
+            {filterQuery ? 'Không tìm thấy lịch sử phù hợp.' : 'Chưa có lịch sử xem phim nào.'}
+          </p>
+          <span className="text-xs text-zinc-400">
+            Tiến trình xem phim sẽ tự động lưu lại để bạn có thể tiếp tục xem dở bất cứ khi nào.
+          </span>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
           {filteredHistory.map((h) => {
-            const pct = h.duration > 0 ? Math.min(100, Math.round((h.currentTime / h.duration) * 100)) : 0;
+            const pct =
+              h.duration > 0 ? Math.min(100, Math.round((h.currentTime / h.duration) * 100)) : 0;
             return (
               <div
                 key={`${h.slug}-${h.episodeSlug}`}
                 onClick={() => onResumePlay(h)}
-                className="group rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800 cursor-pointer"
+                className="group rounded-2xl overflow-hidden bg-white/[0.03] border border-white/[0.08] hover:border-red-500/50 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-red-600/20 cursor-pointer flex flex-col"
               >
-                <div className="relative aspect-video w-full bg-zinc-950">
-                  <img src={getImageUrl(h.thumb_url || h.poster_url)} alt={h.name} className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
-                    <Play className="w-8 h-8 text-white fill-current" />
+                <div className="relative aspect-video w-full bg-[#11131c] overflow-hidden">
+                  <img
+                    src={getImageUrl(h.thumb_url || h.poster_url)}
+                    alt={h.name}
+                    className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-500"
+                  />
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="w-12 h-12 rounded-full bg-red-600 text-white flex items-center justify-center shadow-lg shadow-red-600/50 glow-red-sm">
+                      <Play className="w-5 h-5 text-white fill-current translate-x-0.5" />
+                    </div>
                   </div>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       onRemoveHistoryItem(h.slug, h.episodeSlug);
                     }}
-                    className="absolute top-2 right-2 p-1.5 rounded-full bg-black/75 hover:bg-red-600 text-white transition-colors cursor-pointer z-10"
+                    className="absolute top-2.5 right-2.5 p-2 rounded-full bg-black/75 hover:bg-red-600 text-white transition-all cursor-pointer z-10 hover:scale-110 shadow-lg"
                     title="Xóa tập này khỏi lịch sử"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
-                  <div className="absolute bottom-0 inset-x-0 h-1.5 bg-zinc-800">
-                    <div className="h-full bg-red-600" style={{ width: `${pct}%` }} />
+                  {/* Progress bar container */}
+                  <div className="absolute bottom-0 inset-x-0 h-1.5 bg-black/60 backdrop-blur-sm">
+                    <div
+                      className="h-full bg-gradient-to-r from-red-600 to-rose-500 shadow-sm shadow-red-500"
+                      style={{ width: `${pct}%` }}
+                    />
                   </div>
                 </div>
-                <div className="p-3">
-                  <h4 className="text-sm font-bold text-zinc-100 truncate">{h.name}</h4>
-                  <div className="flex justify-between text-xs text-zinc-400 mt-1">
-                    <span className="text-red-400">{h.episodeName}</span>
-                    <span>Đã xem {pct}%</span>
+                <div className="p-3.5 bg-[#0e1017]/70 flex-1 flex flex-col justify-between">
+                  <h4 className="text-sm font-bold text-zinc-100 group-hover:text-red-400 transition-colors truncate">
+                    {h.name}
+                  </h4>
+                  <div className="flex justify-between items-center text-xs text-zinc-400 mt-2 pt-2 border-t border-white/[0.05]">
+                    <span className="font-semibold text-red-400 truncate max-w-[65%]">
+                      {h.episodeName}
+                    </span>
+                    <span className="text-[11px] font-bold text-zinc-300">Đã xem {pct}%</span>
                   </div>
                 </div>
               </div>
