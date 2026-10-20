@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Bookmark, History, Trash2, Play, Download, Upload } from 'lucide-react';
+import { Bookmark, History, Trash2, Play, Download, Upload, Search } from 'lucide-react';
 import type { FavoriteItem, HistoryItem } from '../types';
 import { getImageUrl } from '../services/api';
 import { exportUserData, importUserData } from '../services/storage';
@@ -26,7 +26,23 @@ export const LibraryView: React.FC<Props> = ({
   onDataImported,
 }) => {
   const [tab, setTab] = useState<'favorites' | 'history'>('favorites');
+  const [filterQuery, setFilterQuery] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const filteredFavs = favorites.filter((f) =>
+    !filterQuery.trim()
+      ? true
+      : f.name.toLowerCase().includes(filterQuery.toLowerCase().trim()) ||
+        (f.origin_name && f.origin_name.toLowerCase().includes(filterQuery.toLowerCase().trim())) ||
+        (f.year && String(f.year).includes(filterQuery.trim()))
+  );
+
+  const filteredHistory = history.filter((h) =>
+    !filterQuery.trim()
+      ? true
+      : h.name.toLowerCase().includes(filterQuery.toLowerCase().trim()) ||
+        h.episodeName.toLowerCase().includes(filterQuery.toLowerCase().trim())
+  );
 
   const handleExport = () => {
     const dataStr = exportUserData();
@@ -77,7 +93,18 @@ export const LibraryView: React.FC<Props> = ({
           </button>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={filterQuery}
+              onChange={(e) => setFilterQuery(e.target.value)}
+              placeholder="Lọc tên phim..."
+              className="pl-8 pr-3 py-1.5 bg-zinc-900 border border-zinc-800 rounded-lg text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-red-500 w-36 sm:w-44"
+            />
+          </div>
+
           <input
             type="file"
             ref={fileInputRef}
@@ -114,11 +141,13 @@ export const LibraryView: React.FC<Props> = ({
       </div>
 
       {tab === 'favorites' ? (
-        favorites.length === 0 ? (
-          <div className="h-48 flex items-center justify-center text-zinc-500 text-sm">Chưa có phim lưu trong tủ.</div>
+        filteredFavs.length === 0 ? (
+          <div className="h-48 flex items-center justify-center text-zinc-500 text-sm">
+            {filterQuery ? 'Không tìm thấy phim phù hợp với từ khóa.' : 'Chưa có phim lưu trong tủ.'}
+          </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-            {favorites.map((m) => (
+            {filteredFavs.map((m) => (
               <div
                 key={m.slug}
                 onClick={() => onSelectMovie(m.slug)}
@@ -141,11 +170,13 @@ export const LibraryView: React.FC<Props> = ({
             ))}
           </div>
         )
-      ) : history.length === 0 ? (
-        <div className="h-48 flex items-center justify-center text-zinc-500 text-sm">Chưa có lịch sử xem phim.</div>
+      ) : filteredHistory.length === 0 ? (
+        <div className="h-48 flex items-center justify-center text-zinc-500 text-sm">
+          {filterQuery ? 'Không tìm thấy lịch sử phù hợp với từ khóa.' : 'Chưa có lịch sử xem phim.'}
+        </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {history.map((h) => {
+          {filteredHistory.map((h) => {
             const pct = h.duration > 0 ? Math.min(100, Math.round((h.currentTime / h.duration) * 100)) : 0;
             return (
               <div

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { X, Play, Bookmark, Star, Calendar, Clock, Loader2, Share2, Check } from 'lucide-react';
-import type { MovieDetail } from '../types';
-import { getImageUrl, getMovieDetail } from '../services/api';
+import type { MovieDetail, MovieItem } from '../types';
+import { getImageUrl, getMovieDetail, getGenreMovies } from '../services/api';
 
 interface Props {
   slug: string;
@@ -18,12 +18,14 @@ export const MovieDetailModal: React.FC<Props> = ({
   isFav,
   onToggleFav,
 }) => {
+  const [activeSlug, setActiveSlug] = useState(slug);
   const [movie, setMovie] = useState<MovieDetail | null>(null);
+  const [relatedMovies, setRelatedMovies] = useState<MovieItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
 
   const handleShare = () => {
-    const url = `${window.location.origin}${window.location.pathname}?info=${movie?.slug || slug}`;
+    const url = `${window.location.origin}${window.location.pathname}?info=${movie?.slug || activeSlug}`;
     navigator.clipboard.writeText(url).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -31,15 +33,38 @@ export const MovieDetailModal: React.FC<Props> = ({
   };
 
   useEffect(() => {
+    setActiveSlug(slug);
+  }, [slug]);
+
+  useEffect(() => {
     let ok = true;
-    getMovieDetail(slug).then((res) => {
-      if (ok) {
+    setLoading(true);
+    getMovieDetail(activeSlug)
+      .then((res) => {
+        if (!ok || !res) {
+          if (ok) setLoading(false);
+          return;
+        }
         setMovie(res);
         setLoading(false);
-      }
-    });
-    return () => { ok = false; };
-  }, [slug]);
+        const genreSlug = res.category?.[0]?.slug;
+        if (genreSlug) {
+          getGenreMovies(genreSlug, 1)
+            .then((gRes) => {
+              if (ok && gRes?.items) {
+                setRelatedMovies(gRes.items.filter((item) => item.slug !== activeSlug).slice(0, 6));
+              }
+            })
+            .catch(() => {});
+        }
+      })
+      .catch(() => {
+        if (ok) setLoading(false);
+      });
+    return () => {
+      ok = false;
+    };
+  }, [activeSlug]);
 
   if (loading) {
     return (
@@ -145,6 +170,38 @@ export const MovieDetailModal: React.FC<Props> = ({
                   >
                     {ep.name}
                   </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {relatedMovies.length > 0 && (
+            <div className="pt-2 border-t border-zinc-800">
+              <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">
+                Phim Cùng Thể Loại
+              </h3>
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                {relatedMovies.map((rel) => (
+                  <div
+                    key={rel.slug}
+                    onClick={() => setActiveSlug(rel.slug)}
+                    className="group cursor-pointer rounded-lg overflow-hidden bg-zinc-800/60 border border-zinc-800 hover:border-zinc-700 transition"
+                  >
+                    <div className="aspect-[2/3] w-full bg-zinc-950 overflow-hidden">
+                      <img
+                        src={getImageUrl(rel.poster_url || rel.thumb_url)}
+                        alt={rel.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        loading="lazy"
+                      />
+                    </div>
+                    <div className="p-1.5">
+                      <p className="text-[11px] font-semibold text-zinc-200 truncate group-hover:text-red-400 transition-colors">
+                        {rel.name}
+                      </p>
+                      <span className="text-[9px] text-zinc-500">{rel.year}</span>
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>
