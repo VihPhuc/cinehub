@@ -225,12 +225,84 @@ export const Navbar: React.FC<Props> = ({
 
           <button
             onClick={() => setMenuOpen(!menuOpen)}
-            className="lg:hidden p-2 rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-300"
+            className="lg:hidden p-2 rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-300 hover:text-white cursor-pointer"
+            aria-label="Toggle menu"
           >
             {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
         </div>
       </div>
+
+      {/* Mobile Drawer */}
+      {menuOpen && (
+        <div className="lg:hidden border-t border-zinc-800 bg-[#0a0a0f]/95 backdrop-blur-xl px-4 py-4 space-y-4 max-h-[calc(100vh-4rem)] overflow-y-auto shadow-2xl">
+          <div className="grid grid-cols-2 gap-2">
+            {NAV_TABS.filter((t) => !['genres', 'countries', 'library'].includes(t.id)).map((t) => (
+              <button
+                key={t.id}
+                onClick={() => {
+                  onSelectTab(t.id);
+                  setMenuOpen(false);
+                }}
+                className={`px-3 py-2 rounded-lg text-sm font-medium text-left transition cursor-pointer ${
+                  activeTab === t.id ? 'bg-red-600 text-white' : 'bg-zinc-900 text-zinc-300 hover:text-white'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+            <button
+              onClick={() => {
+                onSelectTab('library');
+                setMenuOpen(false);
+              }}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-left transition cursor-pointer col-span-2 ${
+                activeTab === 'library' ? 'bg-red-600 text-white' : 'bg-zinc-900 text-zinc-300 hover:text-white'
+              }`}
+            >
+              <Bookmark className="w-4 h-4" /> Tủ Phim Đã Lưu
+            </button>
+          </div>
+
+          {/* Mobile Genres */}
+          <div className="space-y-1.5 pt-2 border-t border-zinc-800/80">
+            <div className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Thể Loại</div>
+            <div className="grid grid-cols-3 gap-1 max-h-36 overflow-y-auto p-1 bg-zinc-950/60 rounded-lg">
+              {GENRES.map((g) => (
+                <button
+                  key={g.slug}
+                  onClick={() => {
+                    onSelectGenre(g.slug, g.name);
+                    setMenuOpen(false);
+                  }}
+                  className="text-left text-[11px] p-1.5 rounded hover:bg-red-600/20 hover:text-red-400 text-zinc-300 truncate"
+                >
+                  {g.name}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Mobile Countries */}
+          <div className="space-y-1.5 pt-2 border-t border-zinc-800/80">
+            <div className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Quốc Gia</div>
+            <div className="grid grid-cols-2 gap-1 max-h-32 overflow-y-auto p-1 bg-zinc-950/60 rounded-lg">
+              {COUNTRIES.map((c) => (
+                <button
+                  key={c.slug}
+                  onClick={() => {
+                    onSelectCountry(c.slug, c.name);
+                    setMenuOpen(false);
+                  }}
+                  className="text-left text-[11px] p-1.5 rounded hover:bg-red-600/20 hover:text-red-400 text-zinc-300 truncate"
+                >
+                  {c.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   );
 };

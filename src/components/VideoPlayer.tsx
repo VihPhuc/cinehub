@@ -35,6 +35,8 @@ export const VideoPlayer: React.FC<Props> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [resumeNotice, setResumeNotice] = useState<string | null>(null);
+  const [speed, setSpeed] = useState<number>(1);
+  const [epFilter, setEpFilter] = useState<string>('');
 
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -43,6 +45,14 @@ export const VideoPlayer: React.FC<Props> = ({
   const server = movie.episodes?.[serverIdx] || movie.episodes?.[0];
   const ep = server?.server_data?.[epIdx] || server?.server_data?.[0];
   const hasNext = Boolean(server?.server_data?.[epIdx + 1]);
+
+  const changeSpeed = (s: number) => {
+    setSpeed(s);
+    if (videoRef.current) {
+      videoRef.current.playbackRate = s;
+    }
+    showToast(`Tốc độ phát: ${s}x`);
+  };
 
   const showToast = useCallback((msg: string) => {
     setToastMsg(msg);
@@ -107,6 +117,9 @@ export const VideoPlayer: React.FC<Props> = ({
 
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         setLoading(false);
+        if (videoRef.current) {
+          videoRef.current.playbackRate = speed;
+        }
         const history = getHistory();
         const saved = history.find((h) => h.slug === movie.slug && h.episodeSlug === ep.slug);
         if (saved && saved.currentTime > 5 && saved.currentTime < (saved.duration - 15)) {
@@ -403,34 +416,74 @@ export const VideoPlayer: React.FC<Props> = ({
               </div>
             </div>
 
-            {ep?.link_embed && ep?.link_m3u8 && (
-              <button
-                onClick={() => setMode(mode === 'hls' ? 'iframe' : 'hls')}
-                className="px-2.5 py-1 text-xs rounded bg-zinc-800 text-zinc-300 border border-zinc-700 cursor-pointer"
-              >
-                {mode === 'hls' ? 'Chuyển Embed' : 'Chuyển HLS'}
-              </button>
-            )}
+            <div className="flex items-center gap-2 flex-wrap">
+              {mode === 'hls' && (
+                <div className="flex items-center gap-1 bg-zinc-800/80 border border-zinc-700/80 rounded-lg p-0.5">
+                  <span className="text-[11px] text-zinc-400 px-1.5 font-semibold">Tốc độ:</span>
+                  {[0.75, 1, 1.25, 1.5, 2].map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => changeSpeed(s)}
+                      className={`px-1.5 py-0.5 rounded text-[11px] font-bold cursor-pointer transition-colors ${
+                        speed === s ? 'bg-red-600 text-white' : 'text-zinc-400 hover:text-white'
+                      }`}
+                    >
+                      {s}x
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {ep?.link_embed && ep?.link_m3u8 && (
+                <button
+                  onClick={() => setMode(mode === 'hls' ? 'iframe' : 'hls')}
+                  className="px-2.5 py-1 text-xs rounded bg-zinc-800 text-zinc-300 border border-zinc-700 hover:bg-zinc-700 cursor-pointer"
+                >
+                  {mode === 'hls' ? 'Chuyển Embed' : 'Chuyển HLS'}
+                </button>
+              )}
+            </div>
           </div>
 
           {server && server.server_data.length > 0 && (
             <div>
-              <div className="flex items-center gap-1.5 mb-2">
-                <Film className="w-3.5 h-3.5 text-zinc-400" />
-                <span className="text-xs font-bold text-zinc-400">Chọn Tập ({server.server_data.length} tập):</span>
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <div className="flex items-center gap-1.5">
+                  <Film className="w-3.5 h-3.5 text-zinc-400" />
+                  <span className="text-xs font-bold text-zinc-400">Chọn Tập ({server.server_data.length} tập):</span>
+                </div>
+                {server.server_data.length > 10 && (
+                  <input
+                    type="text"
+                    value={epFilter}
+                    onChange={(e) => setEpFilter(e.target.value)}
+                    placeholder="Lọc số tập (vd: 12)..."
+                    className="w-36 bg-zinc-800 border border-zinc-700 rounded px-2 py-0.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-red-500"
+                  />
+                )}
               </div>
               <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-1.5 max-h-48 overflow-y-auto">
-                {server.server_data.map((e, idx) => (
-                  <button
-                    key={e.slug}
-                    onClick={() => setEpIdx(idx)}
-                    className={`py-1.5 px-1 rounded text-xs font-medium border truncate cursor-pointer ${
-                      epIdx === idx ? 'bg-red-600 border-red-500 text-white' : 'bg-zinc-800 border-zinc-700/60 text-zinc-300'
-                    }`}
-                  >
-                    {e.name}
-                  </button>
-                ))}
+                {server.server_data
+                  .map((e, idx) => ({ e, idx }))
+                  .filter(({ e }) =>
+                    !epFilter.trim()
+                      ? true
+                      : e.name.toLowerCase().includes(epFilter.toLowerCase().trim()) ||
+                        e.slug.toLowerCase().includes(epFilter.toLowerCase().trim())
+                  )
+                  .map(({ e, idx }) => (
+                    <button
+                      key={e.slug}
+                      onClick={() => setEpIdx(idx)}
+                      className={`py-1.5 px-1 rounded text-xs font-medium border truncate cursor-pointer transition-colors ${
+                        epIdx === idx
+                          ? 'bg-red-600 border-red-500 text-white font-bold'
+                          : 'bg-zinc-800 border-zinc-700/60 text-zinc-300 hover:bg-zinc-700'
+                      }`}
+                    >
+                      {e.name}
+                    </button>
+                  ))}
               </div>
             </div>
           )}

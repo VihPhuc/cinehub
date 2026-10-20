@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { MovieItem } from '../types';
 import { MovieCard } from './MovieCard';
-import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2 } from 'lucide-react';
 
 interface Props {
   title?: string;
@@ -28,6 +28,34 @@ export const MovieGrid: React.FC<Props> = ({
   favorites,
   onToggleFav,
 }) => {
+  const [jumpPage, setJumpPage] = useState('');
+
+  const handleJump = (e: React.FormEvent) => {
+    e.preventDefault();
+    const p = parseInt(jumpPage, 10);
+    if (!isNaN(p) && p >= 1 && p <= totalPages && onPageChange) {
+      onPageChange(p);
+      setJumpPage('');
+    }
+  };
+
+  const getPageNumbers = () => {
+    const pages: (number | string)[] = [];
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      pages.push(1);
+      if (page > 3) pages.push('...');
+      const start = Math.max(2, page - 1);
+      const end = Math.min(totalPages - 1, page + 1);
+      for (let i = start; i <= end; i++) {
+        if (!pages.includes(i)) pages.push(i);
+      }
+      if (page < totalPages - 2) pages.push('...');
+      if (!pages.includes(totalPages)) pages.push(totalPages);
+    }
+    return pages;
+  };
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 w-full">
       {title && (
@@ -66,26 +94,82 @@ export const MovieGrid: React.FC<Props> = ({
 
       {/* Pagination */}
       {totalPages > 1 && onPageChange && !loading && (
-        <div className="flex items-center justify-center gap-2 mt-8">
-          <button
-            onClick={() => onPageChange(Math.max(page - 1, 1))}
-            disabled={page <= 1}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-sm font-medium text-zinc-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-800 cursor-pointer"
-          >
-            <ChevronLeft className="w-4 h-4" /> Trước
-          </button>
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mt-10">
+          <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap justify-center">
+            <button
+              onClick={() => onPageChange(1)}
+              disabled={page <= 1}
+              className="p-2 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-800 cursor-pointer"
+              title="Trang đầu"
+            >
+              <ChevronsLeft className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => onPageChange(Math.max(page - 1, 1))}
+              disabled={page <= 1}
+              className="p-2 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-800 cursor-pointer"
+              title="Trang trước"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
 
-          <span className="text-sm font-medium text-zinc-400 px-3">
-            Trang <span className="text-red-400 font-bold">{page}</span> / {totalPages}
-          </span>
+            {getPageNumbers().map((pNum, idx) =>
+              pNum === '...' ? (
+                <span key={`dots-${idx}`} className="px-2 text-zinc-500 text-sm select-none">
+                  ...
+                </span>
+              ) : (
+                <button
+                  key={`p-${pNum}`}
+                  onClick={() => onPageChange(pNum as number)}
+                  className={`w-9 h-9 rounded-lg text-xs sm:text-sm font-semibold transition cursor-pointer ${
+                    page === pNum
+                      ? 'bg-red-600 text-white shadow-lg shadow-red-600/30'
+                      : 'bg-zinc-900 border border-zinc-800 text-zinc-300 hover:bg-zinc-800 hover:text-white'
+                  }`}
+                >
+                  {pNum}
+                </button>
+              )
+            )}
 
-          <button
-            onClick={() => onPageChange(Math.min(page + 1, totalPages))}
-            disabled={page >= totalPages}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-sm font-medium text-zinc-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-800 cursor-pointer"
-          >
-            Sau <ChevronRight className="w-4 h-4" />
-          </button>
+            <button
+              onClick={() => onPageChange(Math.min(page + 1, totalPages))}
+              disabled={page >= totalPages}
+              className="p-2 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-800 cursor-pointer"
+              title="Trang sau"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => onPageChange(totalPages)}
+              disabled={page >= totalPages}
+              className="p-2 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-800 cursor-pointer"
+              title="Trang cuối"
+            >
+              <ChevronsRight className="w-4 h-4" />
+            </button>
+          </div>
+
+          <form onSubmit={handleJump} className="flex items-center gap-1.5 text-xs text-zinc-400">
+            <span>Đến trang</span>
+            <input
+              type="number"
+              min={1}
+              max={totalPages}
+              value={jumpPage}
+              onChange={(e) => setJumpPage(e.target.value)}
+              placeholder={String(page)}
+              className="w-14 bg-zinc-900 border border-zinc-800 rounded px-2 py-1 text-center text-white focus:outline-none focus:border-red-500 text-xs"
+            />
+            <span>/ {totalPages}</span>
+            <button
+              type="submit"
+              className="px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold cursor-pointer border border-zinc-700"
+            >
+              Đi
+            </button>
+          </form>
         </div>
       )}
     </div>
