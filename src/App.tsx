@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import {
   getCatalogMovies,
   getCountryMovies,
@@ -6,10 +6,11 @@ import {
   getNewUpdatedMovies,
   getMovieDetail,
   searchMovies,
+  getImageUrl,
 } from './services/api';
 import type { MovieDetail, MovieItem, FavoriteItem, HistoryItem } from './types';
 import { getFavorites, getHistory, toggleFavorite, clearHistory, removeHistoryItem } from './services/storage';
-import { ArrowUp, WifiOff } from 'lucide-react';
+import { ArrowUp, WifiOff, Play, Clock, ChevronRight } from 'lucide-react';
 import { Navbar } from './components/Navbar';
 import { HeroBanner } from './components/HeroBanner';
 import { MovieRow } from './components/MovieRow';
@@ -45,10 +46,26 @@ export function App() {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [toast, setToast] = useState<{ msg: string; type?: 'info' | 'success' } | null>(null);
+  const toastTimeoutRef = useRef<number | null>(null);
+
+  const showToast = (msg: string, type: 'info' | 'success' = 'info') => {
+    if (toastTimeoutRef.current) window.clearTimeout(toastTimeoutRef.current);
+    setToast({ msg, type });
+    toastTimeoutRef.current = window.setTimeout(() => {
+      setToast(null);
+    }, 3000);
+  };
 
   useEffect(() => {
-    const handleOnline = () => setIsOffline(false);
-    const handleOffline = () => setIsOffline(true);
+    const handleOnline = () => {
+      setIsOffline(false);
+      showToast('Đã kết nối Internet trở lại!', 'success');
+    };
+    const handleOffline = () => {
+      setIsOffline(true);
+      showToast('Bạn đang ở chế độ ngoại tuyến', 'info');
+    };
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
     return () => {
@@ -251,8 +268,12 @@ export function App() {
   };
 
   const handleToggleFav = (movie: MovieItem | MovieDetail) => {
-    toggleFavorite(movie);
+    const isNowFav = toggleFavorite(movie);
     refreshStorage();
+    showToast(
+      isNowFav ? `Đã lưu "${movie.name}" vào tủ phim` : `Đã bỏ lưu "${movie.name}"`,
+      isNowFav ? 'success' : 'info'
+    );
   };
 
   const favSlugs = favorites.map((f) => f.slug);
@@ -273,13 +294,18 @@ export function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0f1015] text-zinc-100 flex flex-col font-sans">
+    <div className="min-h-screen bg-[#090a0f] text-zinc-100 flex flex-col font-sans relative overflow-x-hidden">
+      {/* Ambient Top Glow */}
+      <div className="pointer-events-none fixed top-0 left-1/2 -translate-x-1/2 w-[900px] h-[360px] bg-red-600/[0.08] blur-[140px] rounded-full z-0" />
+      <div className="pointer-events-none fixed bottom-1/3 right-0 w-[500px] h-[500px] bg-indigo-600/[0.04] blur-[150px] rounded-full z-0" />
+
       {isOffline && (
-        <div className="bg-amber-500 text-zinc-950 font-bold text-xs py-1.5 px-4 text-center flex items-center justify-center gap-2 sticky top-0 z-50 shadow-md">
-          <WifiOff className="w-3.5 h-3.5 shrink-0" />
+        <div className="bg-gradient-to-r from-amber-600 to-amber-500 text-zinc-950 font-black text-xs py-2 px-4 text-center flex items-center justify-center gap-2 sticky top-0 z-50 shadow-lg">
+          <WifiOff className="w-4 h-4 shrink-0" />
           <span>Bạn đang ở chế độ ngoại tuyến. Bạn vẫn có thể xem danh sách Phim Đã Lưu và Lịch Sử.</span>
         </div>
       )}
+
       <Navbar
         activeTab={activeTab}
         onSelectTab={(tab) => {
@@ -304,7 +330,7 @@ export function App() {
         onSelectMovie={(slug) => setSelectedSlug(slug)}
       />
 
-      <main className="flex-1 pb-16">
+      <main className="flex-1 pb-20 relative z-10">
         {activeTab === 'home' && (
           <>
             <HeroBanner
@@ -312,10 +338,127 @@ export function App() {
               onPlay={handleQuickPlay}
               onInfo={(m) => setSelectedSlug(m.slug)}
             />
-            <div className="space-y-4 mt-2">
+
+            {/* Quick Explore Category Chips */}
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 pb-2">
+              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-2">
+                <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider shrink-0 mr-1">
+                  Khám phá nhanh:
+                </span>
+                {[
+                  { id: 'phim-le', label: '🎬 Phim Lẻ Bom Tấn' },
+                  { id: 'phim-bo', label: '📺 Phim Bộ Thịnh Hành' },
+                  { id: 'hoat-hinh', label: '⚡ Anime / Hoạt Hình' },
+                  { id: 'tv-shows', label: '🎪 TV Shows' },
+                  { id: 'library', label: '⭐ Tủ Phim Của Bạn' },
+                ].map((chip) => (
+                  <button
+                    key={chip.id}
+                    onClick={() => {
+                      setActiveTab(chip.id);
+                      setCurrentPage(1);
+                    }}
+                    className="shrink-0 px-3.5 py-1.5 rounded-xl glass-pill hover:bg-white/15 text-xs font-semibold text-zinc-300 hover:text-white transition-all cursor-pointer border border-white/10"
+                  >
+                    {chip.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-6 mt-2">
+              {/* Continue Watching Row */}
+              {history.length > 0 && (
+                <section className="px-4 sm:px-6 max-w-7xl mx-auto w-full">
+                  <div className="flex items-center justify-between mb-3.5">
+                    <div className="flex items-center gap-2">
+                      <span className="w-1.5 h-5 rounded-full bg-red-500 shadow-sm shadow-red-500/50" />
+                      <h2 className="text-lg sm:text-xl font-black text-white font-heading tracking-tight flex items-center gap-2">
+                        Tiếp Tục Xem
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-red-600/20 text-red-400 border border-red-500/30 font-sans font-bold">
+                          {history.length}
+                        </span>
+                      </h2>
+                    </div>
+                    <button
+                      onClick={() => setActiveTab('library')}
+                      className="text-xs font-bold text-zinc-400 hover:text-red-400 flex items-center gap-1 transition-colors cursor-pointer"
+                    >
+                      Xem tất cả <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  <div className="flex gap-3.5 overflow-x-auto pb-3 scrollbar-none snap-x">
+                    {history.slice(0, 10).map((item) => {
+                      const progress =
+                        item.duration > 0
+                          ? Math.min(100, Math.round((item.currentTime / item.duration) * 100))
+                          : 0;
+                      const img = getImageUrl(item.thumb_url || item.poster_url);
+                      return (
+                        <div
+                          key={`${item.slug}-${item.episodeSlug}`}
+                          onClick={() => handleResumePlay(item)}
+                          className="group relative shrink-0 w-60 sm:w-72 rounded-2xl overflow-hidden bg-white/[0.03] border border-white/[0.08] hover:border-red-500/50 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-red-600/15 cursor-pointer snap-start flex flex-col"
+                        >
+                          {/* Thumbnail */}
+                          <div className="relative aspect-video w-full bg-[#11131c] overflow-hidden">
+                            <img
+                              src={img}
+                              alt={item.name}
+                              loading="lazy"
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                            {/* Play Overlay */}
+                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                              <div className="w-10 h-10 rounded-full bg-red-600 text-white flex items-center justify-center shadow-lg glow-red-sm transform scale-75 group-hover:scale-100 transition-transform">
+                                <Play className="w-4 h-4 fill-current translate-x-0.5" />
+                              </div>
+                            </div>
+                            {/* Episode pill */}
+                            <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-md text-[10px] font-bold bg-black/80 backdrop-blur-md text-amber-300 border border-amber-500/30">
+                              {item.episodeName || 'Đang xem'}
+                            </div>
+                            {/* Progress bar */}
+                            <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/20">
+                              <div
+                                className="h-full bg-gradient-to-r from-red-600 to-rose-500 shadow-sm shadow-red-500"
+                                style={{ width: `${progress || 5}%` }}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Info */}
+                          <div className="p-3 bg-[#0d0f17]/60 flex-1 flex flex-col justify-between">
+                            <div>
+                              <h3 className="text-xs sm:text-sm font-bold text-zinc-100 group-hover:text-red-400 transition-colors truncate">
+                                {item.name}
+                              </h3>
+                              {item.origin_name && (
+                                <p className="text-[11px] text-zinc-400 truncate italic">
+                                  {item.origin_name}
+                                </p>
+                              )}
+                            </div>
+                            <div className="flex items-center justify-between text-[10px] text-zinc-400 mt-2 pt-1 border-t border-white/[0.04]">
+                              <span className="text-red-400 font-semibold">{progress}% đã xem</span>
+                              <span className="flex items-center gap-1 text-zinc-400">
+                                <Clock className="w-3 h-3" />
+                                {item.serverName || 'Server VIP'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+              )}
+
               <MovieRow
                 title="Mới Cập Nhật Hôm Nay"
-                subtitle="Phim và tập mới nhất cập nhật từng phút"
+                subtitle="Phim và tập mới nhất cập nhật liên tục từng phút"
                 movies={newUpdated}
                 onSelectMovie={(m) => setSelectedSlug(m.slug)}
                 onQuickPlay={handleQuickPlay}
@@ -324,11 +467,14 @@ export function App() {
               />
               <MovieRow
                 title="Phim Lẻ Đỉnh Cao"
-                subtitle="Bom tấn điện ảnh, chiếu rạp chất lượng cao"
+                subtitle="Bom tấn điện ảnh, chiếu rạp sắc nét chất lượng cao"
                 movies={singleMovies}
                 onSelectMovie={(m) => setSelectedSlug(m.slug)}
                 onQuickPlay={handleQuickPlay}
-                onViewMore={() => { setActiveTab('phim-le'); setCurrentPage(1); }}
+                onViewMore={() => {
+                  setActiveTab('phim-le');
+                  setCurrentPage(1);
+                }}
                 favorites={favSlugs}
                 onToggleFav={handleToggleFav}
               />
@@ -338,7 +484,10 @@ export function App() {
                 movies={seriesMovies}
                 onSelectMovie={(m) => setSelectedSlug(m.slug)}
                 onQuickPlay={handleQuickPlay}
-                onViewMore={() => { setActiveTab('phim-bo'); setCurrentPage(1); }}
+                onViewMore={() => {
+                  setActiveTab('phim-bo');
+                  setCurrentPage(1);
+                }}
                 favorites={favSlugs}
                 onToggleFav={handleToggleFav}
               />
@@ -348,7 +497,10 @@ export function App() {
                 movies={animeMovies}
                 onSelectMovie={(m) => setSelectedSlug(m.slug)}
                 onQuickPlay={handleQuickPlay}
-                onViewMore={() => { setActiveTab('hoat-hinh'); setCurrentPage(1); }}
+                onViewMore={() => {
+                  setActiveTab('hoat-hinh');
+                  setCurrentPage(1);
+                }}
                 favorites={favSlugs}
                 onToggleFav={handleToggleFav}
               />
@@ -358,7 +510,10 @@ export function App() {
                 movies={tvShows}
                 onSelectMovie={(m) => setSelectedSlug(m.slug)}
                 onQuickPlay={handleQuickPlay}
-                onViewMore={() => { setActiveTab('tv-shows'); setCurrentPage(1); }}
+                onViewMore={() => {
+                  setActiveTab('tv-shows');
+                  setCurrentPage(1);
+                }}
                 favorites={favSlugs}
                 onToggleFav={handleToggleFav}
               />
@@ -375,16 +530,22 @@ export function App() {
             onRemoveFav={(slug) => {
               toggleFavorite({ slug, name: '' });
               refreshStorage();
+              showToast('Đã xóa khỏi danh sách đã lưu', 'info');
             }}
             onRemoveHistoryItem={(slug, epSlug) => {
               removeHistoryItem(slug, epSlug);
               refreshStorage();
+              showToast('Đã xóa phim khỏi lịch sử xem', 'info');
             }}
             onClearHistory={() => {
               clearHistory();
               refreshStorage();
+              showToast('Đã xóa sạch lịch sử xem', 'info');
             }}
-            onDataImported={refreshStorage}
+            onDataImported={() => {
+              refreshStorage();
+              showToast('Đã khôi phục dữ liệu sao lưu thành công!', 'success');
+            }}
           />
         )}
 
@@ -403,9 +564,61 @@ export function App() {
         )}
       </main>
 
-      <footer className="bg-zinc-950 border-t border-zinc-900 py-8 px-4 text-center text-xs text-zinc-500">
-        <p className="font-semibold text-zinc-400 mb-1">CINEHUB - Web Xem Phim Toàn Diện</p>
-        <p>Kho phim tổng hợp đa nguồn từ cổ điển tới chiếu rạp mới nhất. Hỗ trợ xem trực tuyến m3u8 và embed tốc độ cao.</p>
+      {/* Enhanced Footer */}
+      <footer className="bg-[#07080b] border-t border-white/[0.08] py-12 px-4 sm:px-6 relative z-10">
+        <div className="max-w-7xl mx-auto space-y-8">
+          {/* Top Feature Badges */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pb-8 border-b border-white/[0.06]">
+            <div className="glass-panel p-4 rounded-2xl flex items-center gap-3.5">
+              <div className="w-10 h-10 rounded-xl bg-red-600/20 text-red-400 flex items-center justify-center shrink-0 border border-red-500/30">
+                🚀
+              </div>
+              <div>
+                <h4 className="text-xs sm:text-sm font-bold text-zinc-100">Luồng Phát Tốc Độ Cao</h4>
+                <p className="text-[11px] text-zinc-400">Xem m3u8 không giật lag, hỗ trợ Full HD & 4K</p>
+              </div>
+            </div>
+            <div className="glass-panel p-4 rounded-2xl flex items-center gap-3.5">
+              <div className="w-10 h-10 rounded-xl bg-indigo-600/20 text-indigo-400 flex items-center justify-center shrink-0 border border-indigo-500/30">
+                📱
+              </div>
+              <div>
+                <h4 className="text-xs sm:text-sm font-bold text-zinc-100">Hỗ Trợ PWA Ngoại Tuyến</h4>
+                <p className="text-[11px] text-zinc-400">Cài đặt như app native trên điện thoại & máy tính</p>
+              </div>
+            </div>
+            <div className="glass-panel p-4 rounded-2xl flex items-center gap-3.5">
+              <div className="w-10 h-10 rounded-xl bg-emerald-600/20 text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/30">
+                ⭐
+              </div>
+              <div>
+                <h4 className="text-xs sm:text-sm font-bold text-zinc-100">Tủ Phim Cá Nhân</h4>
+                <p className="text-[11px] text-zinc-400">Lưu yêu thích, nhớ thời gian và sao lưu JSON</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-zinc-400">
+            <div className="flex items-center gap-2">
+              <span className="text-base font-black font-heading text-white tracking-tight">
+                CINE<span className="bg-gradient-to-r from-red-500 to-amber-400 bg-clip-text text-transparent">HUB</span>
+              </span>
+              <span className="text-zinc-600">|</span>
+              <span>Trải nghiệm xem phim điện ảnh trực tuyến chuẩn hiện đại</span>
+            </div>
+            <div className="flex items-center gap-4 text-xs font-medium">
+              <button onClick={() => { setActiveTab('home'); setCurrentPage(1); }} className="hover:text-white cursor-pointer">Trang Chủ</button>
+              <button onClick={() => { setActiveTab('phim-le'); setCurrentPage(1); }} className="hover:text-white cursor-pointer">Phim Lẻ</button>
+              <button onClick={() => { setActiveTab('phim-bo'); setCurrentPage(1); }} className="hover:text-white cursor-pointer">Phim Bộ</button>
+              <button onClick={() => { setActiveTab('hoat-hinh'); setCurrentPage(1); }} className="hover:text-white cursor-pointer">Anime</button>
+              <button onClick={() => { setActiveTab('library'); }} className="hover:text-white cursor-pointer">Tủ Phim</button>
+            </div>
+          </div>
+
+          <div className="text-center text-[11px] text-zinc-400 border-t border-white/[0.04] pt-6">
+            <p>© 2026 CineHub. Dữ liệu tổng hợp từ nguồn phim công khai PhimAPI và CDN quốc tế.</p>
+          </div>
+        </div>
       </footer>
 
       {selectedSlug && (
@@ -418,11 +631,27 @@ export function App() {
         />
       )}
 
+      {/* Global Toast Notification */}
+      {toast && (
+        <div className="fixed bottom-7 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2.5 px-4 py-2.5 rounded-2xl glass-dropdown border border-white/20 shadow-2xl animate-in fade-in slide-in-from-bottom-3 duration-200 pointer-events-none">
+          <div
+            className={`w-2 h-2 rounded-full shrink-0 ${
+              toast.type === 'success'
+                ? 'bg-emerald-400 shadow-sm shadow-emerald-400'
+                : 'bg-red-500 shadow-sm shadow-red-500'
+            }`}
+          />
+          <span className="text-xs sm:text-sm font-semibold text-white tracking-wide">
+            {toast.msg}
+          </span>
+        </div>
+      )}
+
       {/* Floating Scroll to Top button */}
       {showScrollTop && (
         <button
           onClick={scrollToTop}
-          className="fixed bottom-6 right-6 p-3 rounded-full bg-red-600 hover:bg-red-500 text-white shadow-xl cursor-pointer transition-all z-40 hover:scale-110 active:scale-95 border border-red-400/40"
+          className="fixed bottom-6 right-6 p-3.5 rounded-2xl bg-gradient-to-tr from-red-600 to-rose-500 hover:from-red-500 hover:to-rose-400 text-white shadow-2xl glow-red cursor-pointer transition-all z-40 hover:scale-110 active:scale-95 border border-white/20"
           title="Cuộn lên đầu trang"
         >
           <ArrowUp className="w-5 h-5" />

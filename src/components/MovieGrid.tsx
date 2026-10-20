@@ -1,7 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { MovieItem } from '../types';
 import { MovieCard } from './MovieCard';
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Loader2 } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  RotateCcw,
+  Search,
+  X,
+  SlidersHorizontal,
+} from 'lucide-react';
 
 interface Props {
   title?: string;
@@ -30,19 +39,70 @@ export const MovieGrid: React.FC<Props> = ({
 }) => {
   const [jumpPage, setJumpPage] = useState('');
   const [selectedYear, setSelectedYear] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<'default' | 'name' | 'year'>('default');
+  const [selectedLang, setSelectedLang] = useState<string>('all');
+  const [selectedCinema, setSelectedCinema] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<'default' | 'rating' | 'year' | 'name'>('default');
+  const [filterSearch, setFilterSearch] = useState('');
 
-  const availableYears = Array.from(
-    new Set(movies.map((m) => m.year).filter(Boolean))
-  ).sort((a, b) => (b as number) - (a as number));
+  const availableYears = useMemo(() => {
+    return Array.from(new Set(movies.map((m) => m.year).filter(Boolean))).sort(
+      (a, b) => (b as number) - (a as number)
+    );
+  }, [movies]);
 
-  const displayedMovies = movies
-    .filter((m) => (selectedYear === 'all' ? true : String(m.year) === selectedYear))
-    .sort((a, b) => {
-      if (sortBy === 'name') return a.name.localeCompare(b.name);
-      if (sortBy === 'year') return (b.year || 0) - (a.year || 0);
-      return 0;
-    });
+  const hasActiveFilters =
+    selectedYear !== 'all' ||
+    selectedLang !== 'all' ||
+    selectedCinema !== 'all' ||
+    sortBy !== 'default' ||
+    filterSearch.trim() !== '';
+
+  const resetFilters = () => {
+    setSelectedYear('all');
+    setSelectedLang('all');
+    setSelectedCinema('all');
+    setSortBy('default');
+    setFilterSearch('');
+  };
+
+  const displayedMovies = useMemo(() => {
+    return movies
+      .filter((m) => {
+        // Filter year
+        if (selectedYear !== 'all' && String(m.year) !== selectedYear) return false;
+
+        // Filter language
+        if (selectedLang !== 'all') {
+          const l = (m.lang || '').toLowerCase();
+          if (selectedLang === 'vietsub' && !l.includes('vietsub')) return false;
+          if (selectedLang === 'thuyet-minh' && !l.includes('thuyết minh') && !l.includes('thuyet minh')) return false;
+          if (selectedLang === 'long-tieng' && !l.includes('lồng tiếng') && !l.includes('long tieng')) return false;
+        }
+
+        // Filter cinema
+        if (selectedCinema === 'chieurap' && !m.chieurap) return false;
+
+        // Filter local keyword search
+        if (filterSearch.trim()) {
+          const kw = filterSearch.toLowerCase().trim();
+          const matchName = m.name.toLowerCase().includes(kw);
+          const matchOrigin = (m.origin_name || '').toLowerCase().includes(kw);
+          if (!matchName && !matchOrigin) return false;
+        }
+
+        return true;
+      })
+      .sort((a, b) => {
+        if (sortBy === 'rating') {
+          const rA = a.tmdb?.vote_average || 0;
+          const rB = b.tmdb?.vote_average || 0;
+          return rB - rA;
+        }
+        if (sortBy === 'name') return a.name.localeCompare(b.name);
+        if (sortBy === 'year') return (b.year || 0) - (a.year || 0);
+        return 0;
+      });
+  }, [movies, selectedYear, selectedLang, selectedCinema, filterSearch, sortBy]);
 
   const handleJump = (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,30 +132,100 @@ export const MovieGrid: React.FC<Props> = ({
   };
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 w-full">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-        <div>
-          {title && (
-            <h1 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
-              <span className="w-1.5 h-6 bg-red-600 rounded-full" />
-              {title}
-            </h1>
+      {/* Header and Filter Controls */}
+      <div className="space-y-4 mb-6 pb-5 border-b border-white/[0.08]">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            {title && (
+              <h1 className="text-xl sm:text-3xl font-black text-white font-heading flex items-center gap-2.5 tracking-tight">
+                <span className="w-1.5 h-6 sm:h-7 rounded-full bg-gradient-to-b from-red-500 via-rose-500 to-amber-500 shadow-sm shadow-red-500/50" />
+                {title}
+                {!loading && movies.length > 0 && (
+                  <span className="text-xs font-bold text-zinc-400 bg-white/[0.06] border border-white/[0.08] px-2.5 py-0.5 rounded-full font-sans">
+                    {displayedMovies.length} phim
+                  </span>
+                )}
+              </h1>
+            )}
+            {subtitle && (
+              <p className="text-xs sm:text-sm text-zinc-400 mt-1 font-medium pl-4">
+                {subtitle}
+              </p>
+            )}
+          </div>
+
+          {/* Quick reset button on the right if active */}
+          {hasActiveFilters && (
+            <button
+              onClick={resetFilters}
+              className="self-start sm:self-auto flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 font-bold px-3 py-1.5 rounded-xl bg-red-600/10 hover:bg-red-600/20 border border-red-500/30 transition-colors cursor-pointer"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              Xóa bộ lọc
+            </button>
           )}
-          {subtitle && <p className="text-xs sm:text-sm text-zinc-400 mt-1">{subtitle}</p>}
         </div>
 
+        {/* Filter Controls Row */}
         {!loading && movies.length > 0 && (
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2.5 flex-wrap pt-2">
+            {/* Quick in-page filter search */}
+            <div className="relative flex-1 min-w-[160px] sm:max-w-xs">
+              <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={filterSearch}
+                onChange={(e) => setFilterSearch(e.target.value)}
+                placeholder="Lọc nhanh tên phim..."
+                className="w-full bg-white/[0.05] hover:bg-white/[0.08] focus:bg-white/[0.09] border border-white/[0.1] focus:border-red-500/50 rounded-xl pl-8 pr-7 py-1.5 text-xs text-white placeholder-zinc-500 focus:outline-none transition-all"
+              />
+              {filterSearch && (
+                <button
+                  onClick={() => setFilterSearch('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white p-0.5"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+
+            {/* Language filter */}
+            <div className="flex items-center gap-1 text-xs text-zinc-300">
+              <select
+                value={selectedLang}
+                onChange={(e) => setSelectedLang(e.target.value)}
+                className="bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.1] rounded-xl px-2.5 py-1.5 text-white text-xs focus:outline-none focus:border-red-500 cursor-pointer transition-colors"
+              >
+                <option value="all" className="bg-[#10121a]">Tất cả bản dịch</option>
+                <option value="vietsub" className="bg-[#10121a]">Vietsub</option>
+                <option value="thuyet-minh" className="bg-[#10121a]">Thuyết Minh</option>
+                <option value="long-tieng" className="bg-[#10121a]">Lồng Tiếng</option>
+              </select>
+            </div>
+
+            {/* Cinema filter */}
+            <div className="flex items-center gap-1 text-xs text-zinc-300">
+              <select
+                value={selectedCinema}
+                onChange={(e) => setSelectedCinema(e.target.value)}
+                className="bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.1] rounded-xl px-2.5 py-1.5 text-white text-xs focus:outline-none focus:border-red-500 cursor-pointer transition-colors"
+              >
+                <option value="all" className="bg-[#10121a]">Tất cả định dạng</option>
+                <option value="chieurap" className="bg-[#10121a]">Phim Chiếu Rạp</option>
+              </select>
+            </div>
+
+            {/* Year filter */}
             {availableYears.length > 1 && (
-              <div className="flex items-center gap-1.5 text-xs text-zinc-400">
-                <span>Năm:</span>
+              <div className="flex items-center gap-1 text-xs text-zinc-300">
                 <select
                   value={selectedYear}
                   onChange={(e) => setSelectedYear(e.target.value)}
-                  className="bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1 text-white text-xs focus:outline-none focus:border-red-500 cursor-pointer"
+                  className="bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.1] rounded-xl px-2.5 py-1.5 text-white text-xs focus:outline-none focus:border-red-500 cursor-pointer transition-colors"
                 >
-                  <option value="all">Tất cả năm</option>
+                  <option value="all" className="bg-[#10121a]">Tất cả năm</option>
                   {availableYears.map((y) => (
-                    <option key={y} value={String(y)}>
+                    <option key={y} value={String(y)} className="bg-[#10121a]">
                       {y}
                     </option>
                   ))}
@@ -103,34 +233,63 @@ export const MovieGrid: React.FC<Props> = ({
               </div>
             )}
 
-            <div className="flex items-center gap-1.5 text-xs text-zinc-400">
-              <span>Sắp xếp:</span>
+            {/* Sort by */}
+            <div className="flex items-center gap-1.5 text-xs text-zinc-300 ml-auto">
+              <span className="hidden sm:inline font-semibold text-zinc-400">
+                <SlidersHorizontal className="w-3.5 h-3.5 inline mr-1" />
+                Sắp xếp:
+              </span>
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as any)}
-                className="bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1 text-white text-xs focus:outline-none focus:border-red-500 cursor-pointer"
+                className="bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.1] rounded-xl px-2.5 py-1.5 text-white text-xs focus:outline-none focus:border-red-500 cursor-pointer transition-colors"
               >
-                <option value="default">Mới cập nhật</option>
-                <option value="year">Năm phát hành</option>
-                <option value="name">Tên A-Z</option>
+                <option value="default" className="bg-[#10121a]">Mới cập nhật</option>
+                <option value="rating" className="bg-[#10121a]">Điểm TMDB cao nhất</option>
+                <option value="year" className="bg-[#10121a]">Năm phát hành</option>
+                <option value="name" className="bg-[#10121a]">Tên A-Z</option>
               </select>
             </div>
           </div>
         )}
       </div>
 
+      {/* Grid Content with Skeleton Loaders */}
       {loading ? (
-        <div className="h-64 flex flex-col items-center justify-center gap-3 text-zinc-400">
-          <Loader2 className="w-8 h-8 animate-spin text-red-500" />
-          <span className="text-sm">Đang tải dữ liệu phim...</span>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3.5 sm:gap-4.5">
+          {Array.from({ length: 12 }).map((_, idx) => (
+            <div
+              key={`skeleton-${idx}`}
+              className="rounded-2xl overflow-hidden bg-white/[0.03] border border-white/[0.06] flex flex-col"
+            >
+              <div className="aspect-[2/3] w-full animate-shimmer" />
+              <div className="p-3 space-y-2">
+                <div className="h-4 w-3/4 rounded animate-shimmer" />
+                <div className="h-3 w-1/2 rounded animate-shimmer" />
+              </div>
+            </div>
+          ))}
         </div>
       ) : displayedMovies.length === 0 ? (
-        <div className="h-64 flex flex-col items-center justify-center text-zinc-400">
-          <p className="text-base font-medium">Không tìm thấy phim nào phù hợp.</p>
-          <span className="text-xs text-zinc-500 mt-1">Vui lòng thử tìm kiếm hoặc lọc từ khóa khác.</span>
+        <div className="py-20 flex flex-col items-center justify-center text-zinc-400 glass-panel rounded-2xl max-w-md mx-auto text-center p-6 space-y-3">
+          <p className="text-base font-bold text-zinc-200">Không tìm thấy phim nào phù hợp</p>
+          <span className="text-xs text-zinc-400">
+            {hasActiveFilters
+              ? 'Các bộ lọc đang chọn không có kết quả phù hợp trên trang này.'
+              : 'Vui lòng thử tìm kiếm hoặc chọn danh mục khác.'}
+          </span>
+          {hasActiveFilters && (
+            <button
+              onClick={resetFilters}
+              className="mt-2 flex items-center gap-1.5 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs shadow-md shadow-red-600/30 transition-colors cursor-pointer"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              Xóa tất cả bộ lọc
+            </button>
+          )}
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3.5 sm:gap-4.5">
           {displayedMovies.map((m) => (
             <MovieCard
               key={m.slug}
@@ -145,12 +304,12 @@ export const MovieGrid: React.FC<Props> = ({
 
       {/* Pagination */}
       {totalPages > 1 && onPageChange && !loading && (
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mt-10">
-          <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap justify-center">
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mt-12 pt-6 border-t border-white/[0.08]">
+          <div className="flex items-center gap-1.5 flex-wrap justify-center">
             <button
               onClick={() => onPageChange(1)}
               disabled={page <= 1}
-              className="p-2 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-800 cursor-pointer"
+              className="p-2.5 rounded-xl glass-pill text-zinc-300 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/15 cursor-pointer transition-colors"
               title="Trang đầu"
             >
               <ChevronsLeft className="w-4 h-4" />
@@ -158,7 +317,7 @@ export const MovieGrid: React.FC<Props> = ({
             <button
               onClick={() => onPageChange(Math.max(page - 1, 1))}
               disabled={page <= 1}
-              className="p-2 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-800 cursor-pointer"
+              className="p-2.5 rounded-xl glass-pill text-zinc-300 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/15 cursor-pointer transition-colors"
               title="Trang trước"
             >
               <ChevronLeft className="w-4 h-4" />
@@ -173,10 +332,10 @@ export const MovieGrid: React.FC<Props> = ({
                 <button
                   key={`p-${pNum}`}
                   onClick={() => onPageChange(pNum as number)}
-                  className={`w-9 h-9 rounded-lg text-xs sm:text-sm font-semibold transition cursor-pointer ${
+                  className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
                     page === pNum
-                      ? 'bg-red-600 text-white shadow-lg shadow-red-600/30'
-                      : 'bg-zinc-900 border border-zinc-800 text-zinc-300 hover:bg-zinc-800 hover:text-white'
+                      ? 'bg-gradient-to-r from-red-600 to-rose-600 text-white shadow-lg shadow-red-600/40 glow-red-sm scale-105'
+                      : 'glass-pill text-zinc-300 hover:text-white hover:bg-white/15'
                   }`}
                 >
                   {pNum}
@@ -187,7 +346,7 @@ export const MovieGrid: React.FC<Props> = ({
             <button
               onClick={() => onPageChange(Math.min(page + 1, totalPages))}
               disabled={page >= totalPages}
-              className="p-2 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-800 cursor-pointer"
+              className="p-2.5 rounded-xl glass-pill text-zinc-300 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/15 cursor-pointer transition-colors"
               title="Trang sau"
             >
               <ChevronRight className="w-4 h-4" />
@@ -195,15 +354,15 @@ export const MovieGrid: React.FC<Props> = ({
             <button
               onClick={() => onPageChange(totalPages)}
               disabled={page >= totalPages}
-              className="p-2 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-zinc-800 cursor-pointer"
+              className="p-2.5 rounded-xl glass-pill text-zinc-300 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/15 cursor-pointer transition-colors"
               title="Trang cuối"
             >
               <ChevronsRight className="w-4 h-4" />
             </button>
           </div>
 
-          <form onSubmit={handleJump} className="flex items-center gap-1.5 text-xs text-zinc-400">
-            <span>Đến trang</span>
+          <form onSubmit={handleJump} className="flex items-center gap-2 text-xs text-zinc-400">
+            <span>Đến trang:</span>
             <input
               type="number"
               min={1}
@@ -211,12 +370,12 @@ export const MovieGrid: React.FC<Props> = ({
               value={jumpPage}
               onChange={(e) => setJumpPage(e.target.value)}
               placeholder={String(page)}
-              className="w-14 bg-zinc-900 border border-zinc-800 rounded px-2 py-1 text-center text-white focus:outline-none focus:border-red-500 text-xs"
+              className="w-14 bg-white/[0.06] border border-white/[0.1] rounded-xl px-2.5 py-1.5 text-center text-white focus:outline-none focus:border-red-500 text-xs font-semibold"
             />
-            <span>/ {totalPages}</span>
+            <span className="font-semibold text-zinc-300">/ {totalPages}</span>
             <button
               type="submit"
-              className="px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold cursor-pointer border border-zinc-700"
+              className="px-3 py-1.5 rounded-xl bg-white/[0.08] hover:bg-white/20 text-zinc-200 text-xs font-bold cursor-pointer border border-white/[0.1] transition-colors"
             >
               Đi
             </button>

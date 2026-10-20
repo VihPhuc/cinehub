@@ -36,36 +36,43 @@ export const MovieRow: React.FC<Props> = ({
   if (!movies.length) return null;
 
   return (
-    <section className="py-4 px-4 sm:px-6 max-w-7xl mx-auto w-full">
+    <section className="py-5 px-4 sm:px-6 max-w-7xl mx-auto w-full">
       {/* Header */}
-      <div className="flex items-end justify-between mb-3">
+      <div className="flex items-end justify-between mb-4">
         <div>
-          <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
-            <span className="w-1.5 h-5 bg-red-600 rounded-full inline-block" />
+          <h2 className="text-xl sm:text-2xl font-black text-white font-heading flex items-center gap-2.5 tracking-tight">
+            <span className="w-1.5 h-6 rounded-full bg-gradient-to-b from-red-500 via-rose-500 to-amber-500 shadow-sm shadow-red-500/50" />
             {title}
           </h2>
-          {subtitle && <p className="text-xs text-zinc-400 mt-0.5">{subtitle}</p>}
+          {subtitle && (
+            <p className="text-xs sm:text-sm text-zinc-400 mt-1 font-medium pl-4">
+              {subtitle}
+            </p>
+          )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 sm:gap-3">
           {onViewMore && (
             <button
               onClick={onViewMore}
-              className="text-xs font-semibold text-zinc-400 hover:text-red-400 flex items-center gap-0.5 cursor-pointer"
+              className="group text-xs sm:text-sm font-bold text-zinc-400 hover:text-red-400 flex items-center gap-1 cursor-pointer transition-colors px-3 py-1.5 rounded-xl hover:bg-white/[0.05]"
             >
-              Xem tất cả <ArrowRight className="w-3.5 h-3.5" />
+              Xem tất cả
+              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
             </button>
           )}
-          <div className="hidden sm:flex items-center gap-1">
+          <div className="hidden sm:flex items-center gap-1.5">
             <button
               onClick={() => scroll('left')}
-              className="p-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-white cursor-pointer"
+              className="p-2 rounded-xl glass-pill hover:bg-white/15 text-zinc-300 hover:text-white transition-all cursor-pointer border border-white/10 hover:border-white/20 active:scale-95"
+              aria-label="Scroll left"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
             <button
               onClick={() => scroll('right')}
-              className="p-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 hover:text-white cursor-pointer"
+              className="p-2 rounded-xl glass-pill hover:bg-white/15 text-zinc-300 hover:text-white transition-all cursor-pointer border border-white/10 hover:border-white/20 active:scale-95"
+              aria-label="Scroll right"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
@@ -76,11 +83,11 @@ export const MovieRow: React.FC<Props> = ({
       {/* Horizontal List */}
       <div
         ref={scrollerRef}
-        className="flex gap-3 sm:gap-4 overflow-x-auto pb-3 pt-1 scroll-smooth no-scrollbar scrollbar-none"
+        className="flex gap-3 sm:gap-4 overflow-x-auto pb-4 pt-1 scroll-smooth no-scrollbar"
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
       >
         {movies.map((movie) => (
-          <div key={movie.slug} className="w-[140px] sm:w-[170px] lg:w-[190px] shrink-0">
+          <div key={movie.slug} className="w-[145px] sm:w-[175px] lg:w-[195px] shrink-0">
             <MovieCard
               movie={movie}
               onClick={() => onSelectMovie(movie)}
