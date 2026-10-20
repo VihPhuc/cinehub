@@ -1,5 +1,6 @@
-// ponytail: Basic Cache-First shell worker. Upgrade to Workbox when background sync or push notifications needed.
-const CACHE_NAME = 'cinehub-shell-v1';
+// ponytail: Basic Cache-First shell worker with stale-while-revalidate API caching.
+const CACHE_NAME = 'cinehub-shell-v2';
+const API_CACHE_NAME = 'cinehub-api-v1';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -20,7 +21,7 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((keys) =>
       Promise.all(
         keys.map((key) => {
-          if (key !== CACHE_NAME) {
+          if (key !== CACHE_NAME && key !== API_CACHE_NAME) {
             return caches.delete(key);
           }
         })
@@ -33,8 +34,34 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // Skip non-GET and cross-origin video streams/APIs
-  if (event.request.method !== 'GET' || url.hostname.includes('phimapi.com') || url.hostname.includes('kkphim') || url.pathname.endsWith('.m3u8') || url.pathname.endsWith('.ts')) {
+  // Skip non-GET requests and video streams
+  if (
+    event.request.method !== 'GET' ||
+    url.hostname.includes('kkphim') ||
+    url.pathname.endsWith('.m3u8') ||
+    url.pathname.endsWith('.ts')
+  ) {
+    return;
+  }
+
+  // Handle API caching (phimapi.com) with stale-while-revalidate
+  if (url.hostname.includes('phimapi.com')) {
+    event.respondWith(
+      caches.open(API_CACHE_NAME).then((cache) => {
+        return cache.match(event.request).then((cachedResponse) => {
+          const fetchPromise = fetch(event.request)
+            .then((networkResponse) => {
+              if (networkResponse && networkResponse.status === 200) {
+                cache.put(event.request, networkResponse.clone());
+              }
+              return networkResponse;
+            })
+            .catch(() => cachedResponse);
+
+          return cachedResponse || fetchPromise;
+        });
+      })
+    );
     return;
   }
 
@@ -42,7 +69,6 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {
-        // Fetch in background to update cache (stale-while-revalidate)
         fetch(event.request)
           .then((networkResponse) => {
             if (networkResponse && networkResponse.status === 200) {

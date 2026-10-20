@@ -9,7 +9,7 @@ import {
   getImageUrl,
 } from './services/api';
 import type { MovieDetail, MovieItem, FavoriteItem, HistoryItem } from './types';
-import { getFavorites, getHistory, toggleFavorite, clearHistory, removeHistoryItem } from './services/storage';
+import { getFavorites, getHistory, toggleFavorite, clearHistory, removeHistoryItem, subscribeToStorage } from './services/storage';
 import { ArrowUp, WifiOff, Play, Clock, ChevronRight } from 'lucide-react';
 import { Navbar } from './components/Navbar';
 import { HeroBanner } from './components/HeroBanner';
@@ -42,8 +42,8 @@ export function App() {
   const [watchServerIdx, setWatchServerIdx] = useState(0);
   const [watchEpIdx, setWatchEpIdx] = useState(0);
 
-  const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
-  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [favorites, setFavorites] = useState<FavoriteItem[]>(() => getFavorites());
+  const [history, setHistory] = useState<HistoryItem[]>(() => getHistory());
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [toast, setToast] = useState<{ msg: string; type?: 'info' | 'success' } | null>(null);
@@ -73,6 +73,42 @@ export function App() {
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
+
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+  useEffect(() => {
+    const handleBeforeInstall = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+  }, []);
+
+  const handleInstallApp = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const choice = await deferredPrompt.userChoice;
+      if (choice?.outcome === 'accepted') {
+        showToast('Đang cài đặt CineHub...', 'success');
+      }
+      setDeferredPrompt(null);
+    } else {
+      showToast('Ứng dụng đã sẵn sàng chạy trên trình duyệt của bạn', 'info');
+    }
+  };
+
+  const handleRandomMovie = () => {
+    const pool = [...newUpdated, ...singleMovies, ...seriesMovies, ...animeMovies, ...tvShows];
+    if (pool.length > 0) {
+      const randomIdx = Math.floor(Math.random() * pool.length);
+      const picked = pool[randomIdx];
+      setSelectedSlug(picked.slug);
+      showToast(`🎲 Đã chọn ngẫu nhiên: "${picked.name}"`, 'success');
+    } else {
+      showToast('Đang tải danh sách phim, vui lòng thử lại sau...', 'info');
+    }
+  };
 
   useEffect(() => {
     const handleScroll = () => {
@@ -192,6 +228,12 @@ export function App() {
     setFavorites(getFavorites());
     setHistory(getHistory());
   };
+
+  useEffect(() => {
+    return subscribeToStorage(() => {
+      refreshStorage();
+    });
+  }, []);
 
   useEffect(() => {
     refreshStorage();
@@ -328,6 +370,9 @@ export function App() {
           setActiveTab('country');
         }}
         onSelectMovie={(slug) => setSelectedSlug(slug)}
+        onRandomMovie={handleRandomMovie}
+        onInstallPwa={handleInstallApp}
+        canInstallPwa={Boolean(deferredPrompt)}
       />
 
       <main className="flex-1 pb-20 relative z-10">
@@ -454,6 +499,20 @@ export function App() {
                     })}
                   </div>
                 </section>
+              )}
+
+              {/* TOP 10 Trending Row with Giant Ranking Numbers */}
+              {newUpdated.length >= 5 && (
+                <MovieRow
+                  title="TOP 10 Thịnh Hành Nhất Hôm Nay"
+                  subtitle="Bảng xếp hạng 10 siêu phẩm được quan tâm và xem nhiều nhất trong ngày"
+                  movies={newUpdated}
+                  isTop10
+                  onSelectMovie={(m) => setSelectedSlug(m.slug)}
+                  onQuickPlay={handleQuickPlay}
+                  favorites={favSlugs}
+                  onToggleFav={handleToggleFav}
+                />
               )}
 
               <MovieRow

@@ -7,6 +7,7 @@ interface Props {
   title: string;
   subtitle?: string;
   movies: MovieItem[];
+  isTop10?: boolean;
   onSelectMovie: (m: MovieItem) => void;
   onQuickPlay?: (m: MovieItem) => void;
   onViewMore?: () => void;
@@ -18,6 +19,7 @@ export const MovieRow: React.FC<Props> = ({
   title,
   subtitle,
   movies,
+  isTop10,
   onSelectMovie,
   onQuickPlay,
   onViewMore,
@@ -34,6 +36,7 @@ export const MovieRow: React.FC<Props> = ({
   };
 
   if (!movies.length) return null;
+  const displayMovies = isTop10 ? movies.slice(0, 10) : movies;
 
   return (
     <section className="py-5 px-4 sm:px-6 max-w-7xl mx-auto w-full">
@@ -86,17 +89,41 @@ export const MovieRow: React.FC<Props> = ({
         className="flex gap-3 sm:gap-4 overflow-x-auto pb-4 pt-1 scroll-smooth no-scrollbar"
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
       >
-        {movies.map((movie) => (
-          <div key={movie.slug} className="w-[145px] sm:w-[175px] lg:w-[195px] shrink-0">
-            <MovieCard
-              movie={movie}
-              onClick={() => onSelectMovie(movie)}
-              onQuickPlay={() => (onQuickPlay ? onQuickPlay(movie) : onSelectMovie(movie))}
-              isFav={favorites.includes(movie.slug)}
-              onToggleFav={() => onToggleFav(movie)}
-            />
-          </div>
-        ))}
+        {displayMovies.map((movie, idx) =>
+          isTop10 ? (
+            <div key={movie.slug} className="flex items-center shrink-0 pl-1">
+              <span
+                className="text-7xl sm:text-8xl lg:text-9xl font-black font-heading select-none -mr-4 sm:-mr-6 z-10 pointer-events-none drop-shadow-2xl"
+                style={{
+                  WebkitTextStroke: '2.5px rgba(255, 255, 255, 0.4)',
+                  WebkitTextFillColor: '#0c0e16',
+                  filter: 'drop-shadow(0 6px 16px rgba(225, 29, 72, 0.35))',
+                }}
+              >
+                {idx + 1}
+              </span>
+              <div className="w-[145px] sm:w-[175px] lg:w-[195px] shrink-0">
+                <MovieCard
+                  movie={movie}
+                  onClick={() => onSelectMovie(movie)}
+                  onQuickPlay={() => (onQuickPlay ? onQuickPlay(movie) : onSelectMovie(movie))}
+                  isFav={favorites.includes(movie.slug)}
+                  onToggleFav={() => onToggleFav(movie)}
+                />
+              </div>
+            </div>
+          ) : (
+            <div key={movie.slug} className="w-[145px] sm:w-[175px] lg:w-[195px] shrink-0">
+              <MovieCard
+                movie={movie}
+                onClick={() => onSelectMovie(movie)}
+                onQuickPlay={() => (onQuickPlay ? onQuickPlay(movie) : onSelectMovie(movie))}
+                isFav={favorites.includes(movie.slug)}
+                onToggleFav={() => onToggleFav(movie)}
+              />
+            </div>
+          )
+        )}
       </div>
     </section>
   );

@@ -57,7 +57,10 @@ export const VideoPlayer: React.FC<Props> = ({
   const hlsInstanceRef = useRef<Hls | null>(null);
   const toastTimeoutRef = useRef<number | null>(null);
   const speedRef = useRef(speed);
-  speedRef.current = speed;
+
+  useEffect(() => {
+    speedRef.current = speed;
+  }, [speed]);
 
   const server = movie.episodes?.[serverIdx] || movie.episodes?.[0];
   const ep = server?.server_data?.[epIdx] || server?.server_data?.[0];
@@ -506,9 +509,15 @@ export const VideoPlayer: React.FC<Props> = ({
           theaterMode ? 'max-w-none px-0 py-0 bg-black' : 'max-w-7xl px-3 sm:px-6 py-6'
         }`}
       >
-        <div
-          ref={containerRef}
-          className={`relative aspect-video w-full bg-black overflow-hidden shadow-2xl group ${
+        {/* Cinema Ambilight Wrapper */}
+        <div className="relative w-full">
+          {!theaterMode && (
+            <div className="absolute -inset-2 sm:-inset-4 bg-gradient-to-r from-red-600/20 via-rose-600/15 to-amber-500/20 blur-3xl opacity-70 pointer-events-none rounded-3xl" />
+          )}
+
+          <div
+            ref={containerRef}
+            className={`relative aspect-video w-full bg-black overflow-hidden shadow-2xl group ${
             theaterMode
               ? 'rounded-none max-h-[85vh]'
               : 'rounded-2xl border border-white/[0.1] shadow-2xl shadow-black/80'
@@ -621,6 +630,7 @@ export const VideoPlayer: React.FC<Props> = ({
             </div>
           )}
         </div>
+      </div>
 
         {/* Controls, Servers & Episodes Section */}
         <div

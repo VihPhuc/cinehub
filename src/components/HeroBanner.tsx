@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Play, Pause, Info, Star, ChevronLeft, ChevronRight, Flame } from 'lucide-react';
 import type { MovieItem } from '../types';
-import { getImageUrl } from '../services/api';
+import { getImageUrl, prefetchMovieDetail } from '../services/api';
 
 interface Props {
   movies: MovieItem[];
@@ -24,8 +24,16 @@ export const HeroBanner: React.FC<Props> = ({ movies, onPlay, onInfo }) => {
     return () => clearInterval(interval);
   }, [maxSlides, isAutoPlay, isHovered]);
 
-  if (!movies.length) return null;
   const current = movies[index] || movies[0];
+  const currentSlug = current?.slug;
+
+  useEffect(() => {
+    if (currentSlug) {
+      prefetchMovieDetail(currentSlug);
+    }
+  }, [currentSlug]);
+
+  if (!movies.length || !current) return null;
   const bg = getImageUrl(current.poster_url || current.thumb_url);
 
   return (
