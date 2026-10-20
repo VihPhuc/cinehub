@@ -1,0 +1,16 @@
+{
+  "short_name": "CineHub",
+  "name": "CineHub - Xem Phim Online HD Miễn Phí",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192 512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#0f1015",
+  "theme_color": "#e50914",
+  "display": "standalone",
+  "orientation": "any"
+}

@@ -12,6 +12,8 @@ import {
   Moon,
   Timer,
   PictureInPicture2,
+  HelpCircle,
+  X,
 } from 'lucide-react';
 import type { MovieDetail } from '../types';
 import { saveHistory, getHistory } from '../services/storage';
@@ -43,6 +45,7 @@ export const VideoPlayer: React.FC<Props> = ({
   const [theaterMode, setTheaterMode] = useState<boolean>(false);
   const [sleepRemaining, setSleepRemaining] = useState<number | null>(null);
   const [showTimerMenu, setShowTimerMenu] = useState<boolean>(false);
+  const [showShortcutsModal, setShowShortcutsModal] = useState<boolean>(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -305,6 +308,12 @@ export const VideoPlayer: React.FC<Props> = ({
           video.muted = !video.muted;
           showToast(video.muted ? 'Đã tắt tiếng' : 'Đã bật tiếng');
           break;
+        case 'Slash':
+          if (e.shiftKey) {
+            e.preventDefault();
+            setShowShortcutsModal((prev) => !prev);
+          }
+          break;
       }
     };
 
@@ -386,6 +395,15 @@ export const VideoPlayer: React.FC<Props> = ({
               <PictureInPicture2 className="w-3.5 h-3.5" />
             </button>
           )}
+
+          {/* Keyboard shortcuts */}
+          <button
+            onClick={() => setShowShortcutsModal(true)}
+            className="flex items-center gap-1 px-2 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded text-xs font-semibold cursor-pointer border border-zinc-700/60"
+            title="Bảng phím tắt (?)"
+          >
+            <HelpCircle className="w-3.5 h-3.5 text-zinc-400" />
+          </button>
 
           <button
             onClick={handleShare}
@@ -600,7 +618,67 @@ export const VideoPlayer: React.FC<Props> = ({
         </div>
       </div>
     </div>
-  </div>
+
+      {showShortcutsModal && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setShowShortcutsModal(false)}
+        >
+          <div
+            className="bg-zinc-900 border border-zinc-700 rounded-2xl max-w-sm w-full p-5 space-y-4 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+              <h3 className="font-bold text-white text-base flex items-center gap-2">
+                <HelpCircle className="w-5 h-5 text-red-500" /> Phím tắt xem phim
+              </h3>
+              <button
+                onClick={() => setShowShortcutsModal(false)}
+                className="p-1 rounded-full text-zinc-400 hover:text-white hover:bg-zinc-800 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="space-y-2.5 text-xs text-zinc-300">
+              <div className="flex justify-between items-center py-1 border-b border-zinc-800/50">
+                <span className="font-semibold text-zinc-100">Dừng / Tiếp tục</span>
+                <span className="px-2 py-0.5 bg-zinc-800 rounded font-mono text-amber-400">Space hoặc K</span>
+              </div>
+              <div className="flex justify-between items-center py-1 border-b border-zinc-800/50">
+                <span className="font-semibold text-zinc-100">Tua lùi 10 giây</span>
+                <span className="px-2 py-0.5 bg-zinc-800 rounded font-mono text-amber-400">←</span>
+              </div>
+              <div className="flex justify-between items-center py-1 border-b border-zinc-800/50">
+                <span className="font-semibold text-zinc-100">Tua tới 10 giây</span>
+                <span className="px-2 py-0.5 bg-zinc-800 rounded font-mono text-amber-400">→</span>
+              </div>
+              <div className="flex justify-between items-center py-1 border-b border-zinc-800/50">
+                <span className="font-semibold text-zinc-100">Tăng / Giảm âm</span>
+                <span className="px-2 py-0.5 bg-zinc-800 rounded font-mono text-amber-400">↑ / ↓</span>
+              </div>
+              <div className="flex justify-between items-center py-1 border-b border-zinc-800/50">
+                <span className="font-semibold text-zinc-100">Bật / Tắt tiếng</span>
+                <span className="px-2 py-0.5 bg-zinc-800 rounded font-mono text-amber-400">M</span>
+              </div>
+              <div className="flex justify-between items-center py-1 border-b border-zinc-800/50">
+                <span className="font-semibold text-zinc-100">Toàn màn hình</span>
+                <span className="px-2 py-0.5 bg-zinc-800 rounded font-mono text-amber-400">F</span>
+              </div>
+              <div className="flex justify-between items-center py-1">
+                <span className="font-semibold text-zinc-100">Mở phím tắt này</span>
+                <span className="px-2 py-0.5 bg-zinc-800 rounded font-mono text-amber-400">Shift + ?</span>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowShortcutsModal(false)}
+              className="w-full py-2 bg-red-600 hover:bg-red-500 rounded-xl font-bold text-xs text-white cursor-pointer transition-colors"
+            >
+              Đã hiểu
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 

@@ -9,6 +9,7 @@ import {
 } from './services/api';
 import type { MovieDetail, MovieItem, FavoriteItem, HistoryItem } from './types';
 import { getFavorites, getHistory, toggleFavorite, clearHistory, removeHistoryItem } from './services/storage';
+import { ArrowUp } from 'lucide-react';
 import { Navbar } from './components/Navbar';
 import { HeroBanner } from './components/HeroBanner';
 import { MovieRow } from './components/MovieRow';
@@ -42,6 +43,19 @@ export function App() {
 
   const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
   const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowScrollTop(window.scrollY > 400);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   // ponytail: url sync uses native URLSearchParams instead of router package
   useEffect(() => {
@@ -384,6 +398,17 @@ export function App() {
           isFav={favSlugs.includes(selectedSlug)}
           onToggleFav={handleToggleFav}
         />
+      )}
+
+      {/* Floating Scroll to Top button */}
+      {showScrollTop && (
+        <button
+          onClick={scrollToTop}
+          className="fixed bottom-6 right-6 p-3 rounded-full bg-red-600 hover:bg-red-500 text-white shadow-xl cursor-pointer transition-all z-40 hover:scale-110 active:scale-95 border border-red-400/40"
+          title="Cuộn lên đầu trang"
+        >
+          <ArrowUp className="w-5 h-5" />
+        </button>
       )}
     </div>
   );
