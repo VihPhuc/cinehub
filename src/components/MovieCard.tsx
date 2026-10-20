@@ -1,7 +1,7 @@
 import React from 'react';
 import { Play, Star, Bookmark } from 'lucide-react';
 import type { MovieItem } from '../types';
-import { getImageUrl } from '../services/api';
+import { getImageUrl, prefetchMovieDetail } from '../services/api';
 
 interface Props {
   movie: MovieItem;
@@ -23,6 +23,7 @@ export const MovieCard: React.FC<Props> = ({
   return (
     <div
       onClick={onClick}
+      onMouseEnter={() => prefetchMovieDetail(movie.slug)}
       className="group relative flex flex-col rounded-2xl overflow-hidden bg-white/[0.03] border border-white/[0.07] hover:border-red-500/50 transition-all duration-300 hover:-translate-y-1.5 hover:shadow-2xl hover:shadow-red-600/20 cursor-pointer"
     >
       {/* Poster Image Container */}

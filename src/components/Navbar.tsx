@@ -1,8 +1,30 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Film, Search, Bookmark, ChevronDown, Menu, X, Loader2 } from 'lucide-react';
+import {
+  Film,
+  Search,
+  Bookmark,
+  ChevronDown,
+  Menu,
+  X,
+  Loader2,
+  Sparkles,
+  Download,
+  TrendingUp,
+  History,
+} from 'lucide-react';
 import { GENRES, COUNTRIES, NAV_TABS } from '../constants/filters';
 import { searchMovies, getImageUrl } from '../services/api';
 import type { MovieItem } from '../types';
+
+const RECENT_SEARCHES_KEY = 'cinehub_recent_searches';
+const TRENDING_TAGS = [
+  'Phim Chiếu Rạp',
+  'Anime Mới',
+  'Hàn Quốc',
+  'Kinh Dị',
+  'Hành Động',
+  'Gia Đình',
+];
 
 interface Props {
   activeTab: string;
@@ -11,6 +33,9 @@ interface Props {
   onSelectGenre: (slug: string, name: string) => void;
   onSelectCountry: (slug: string, name: string) => void;
   onSelectMovie?: (slug: string) => void;
+  onRandomMovie?: () => void;
+  onInstallPwa?: () => void;
+  canInstallPwa?: boolean;
 }
 
 export const Navbar: React.FC<Props> = ({
@@ -20,6 +45,9 @@ export const Navbar: React.FC<Props> = ({
   onSelectGenre,
   onSelectCountry,
   onSelectMovie,
+  onRandomMovie,
+  onInstallPwa,
+  canInstallPwa,
 }) => {
   const [q, setQ] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
@@ -29,6 +57,47 @@ export const Navbar: React.FC<Props> = ({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const searchBoxRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const [recentSearches, setRecentSearches] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem(RECENT_SEARCHES_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const saveRecentSearch = (term: string) => {
+    const trimmed = term.trim();
+    if (!trimmed) return;
+    const next = [
+      trimmed,
+      ...recentSearches.filter((s) => s.toLowerCase() !== trimmed.toLowerCase()),
+    ].slice(0, 5);
+    setRecentSearches(next);
+    localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(next));
+  };
+
+  const removeRecentSearch = (term: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const next = recentSearches.filter((s) => s !== term);
+    setRecentSearches(next);
+    localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(next));
+  };
+
+  const clearRecentSearches = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setRecentSearches([]);
+    localStorage.removeItem(RECENT_SEARCHES_KEY);
+  };
+
+  const handleSelectTag = (tag: string) => {
+    setQ(tag);
+    saveRecentSearch(tag);
+    setShowSuggestions(false);
+    onSearch(tag);
+    setMenuOpen(false);
+  };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -56,19 +125,27 @@ export const Navbar: React.FC<Props> = ({
       return;
     }
 
+    const abortCtrl = new AbortController();
     const timer = setTimeout(() => {
       setIsSearching(true);
-      searchMovies(q.trim(), 1)
+      searchMovies(q.trim(), 1, abortCtrl.signal)
         .then((res) => {
-          setSuggestions(res.items.slice(0, 6));
-          setIsSearching(false);
+          if (!abortCtrl.signal.aborted) {
+            setSuggestions(res.items.slice(0, 6));
+            setIsSearching(false);
+          }
         })
         .catch(() => {
-          setIsSearching(false);
+          if (!abortCtrl.signal.aborted) {
+            setIsSearching(false);
+          }
         });
-    }, 300);
+    }, 250);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      abortCtrl.abort();
+    };
   }, [q]);
 
   useEffect(() => {
@@ -84,6 +161,7 @@ export const Navbar: React.FC<Props> = ({
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (q.trim()) {
+      saveRecentSearch(q.trim());
       setShowSuggestions(false);
       onSearch(q.trim());
       setMenuOpen(false);
@@ -249,75 +327,165 @@ export const Navbar: React.FC<Props> = ({
               )}
             </form>
 
-            {/* Suggestions Popup */}
-            {showSuggestions && q.trim().length >= 2 && (
-              <div className="absolute top-full right-0 mt-2 w-80 sm:w-96 glass-dropdown rounded-2xl shadow-2xl overflow-hidden z-50">
-                <div className="p-2.5 border-b border-white/[0.08] text-[11px] font-bold text-zinc-400 uppercase tracking-wider flex items-center justify-between">
-                  <span>Kết quả gợi ý</span>
-                  {isSearching && <Loader2 className="w-3.5 h-3.5 text-red-500 animate-spin" />}
-                </div>
-                {suggestions.length === 0 && !isSearching ? (
-                  <div className="p-4 text-center text-xs text-zinc-400">
-                    Không tìm thấy phim phù hợp
-                  </div>
+            {/* Suggestions & Discovery Popup */}
+            {showSuggestions && (
+              <div className="absolute top-full right-0 mt-2 w-80 sm:w-96 glass-dropdown rounded-2xl shadow-2xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                {q.trim().length >= 2 ? (
+                  <>
+                    <div className="p-2.5 border-b border-white/[0.08] text-[11px] font-bold text-zinc-400 uppercase tracking-wider flex items-center justify-between">
+                      <span>Kết quả gợi ý</span>
+                      {isSearching && <Loader2 className="w-3.5 h-3.5 text-red-500 animate-spin" />}
+                    </div>
+                    {suggestions.length === 0 && !isSearching ? (
+                      <div className="p-4 text-center text-xs text-zinc-400">
+                        Không tìm thấy phim phù hợp
+                      </div>
+                    ) : (
+                      <div className="max-h-80 overflow-y-auto divide-y divide-white/[0.05]">
+                        {suggestions.map((m) => (
+                          <button
+                            key={m.slug}
+                            type="button"
+                            onClick={() => {
+                              saveRecentSearch(m.name);
+                              setShowSuggestions(false);
+                              setQ('');
+                              onSelectMovie?.(m.slug);
+                            }}
+                            className="w-full flex items-center gap-3 p-2.5 hover:bg-white/[0.08] transition-colors text-left cursor-pointer group"
+                          >
+                            <img
+                              src={getImageUrl(m.thumb_url || m.poster_url)}
+                              alt={m.name}
+                              className="w-10 h-14 object-cover rounded-lg bg-zinc-950 shrink-0 border border-white/[0.08] group-hover:border-red-500/40 transition-colors"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs sm:text-sm font-bold text-zinc-100 group-hover:text-red-400 transition-colors truncate">
+                                {m.name}
+                              </p>
+                              {m.origin_name && (
+                                <p className="text-[11px] text-zinc-400 truncate italic">
+                                  {m.origin_name}
+                                </p>
+                              )}
+                              <div className="flex items-center gap-2 mt-1 text-[10px] text-zinc-400">
+                                {m.year && <span className="text-zinc-300 font-semibold">{m.year}</span>}
+                                {m.quality && (
+                                  <span className="px-1.5 py-0.2 rounded bg-red-600/80 text-white font-bold">
+                                    {m.quality}
+                                  </span>
+                                )}
+                                {m.episode_current && (
+                                  <span className="text-amber-400 font-medium truncate">
+                                    {m.episode_current}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            saveRecentSearch(q.trim());
+                            setShowSuggestions(false);
+                            onSearch(q.trim());
+                          }}
+                          className="w-full p-2.5 text-center text-xs font-bold text-red-400 hover:text-red-300 hover:bg-red-600/10 transition-colors cursor-pointer"
+                        >
+                          Xem tất cả kết quả cho "{q}" →
+                        </button>
+                      </div>
+                    )}
+                  </>
                 ) : (
-                  <div className="max-h-80 overflow-y-auto divide-y divide-white/[0.05]">
-                    {suggestions.map((m) => (
-                      <button
-                        key={m.slug}
-                        type="button"
-                        onClick={() => {
-                          setShowSuggestions(false);
-                          setQ('');
-                          onSelectMovie?.(m.slug);
-                        }}
-                        className="w-full flex items-center gap-3 p-2.5 hover:bg-white/[0.08] transition-colors text-left cursor-pointer group"
-                      >
-                        <img
-                          src={getImageUrl(m.thumb_url || m.poster_url)}
-                          alt={m.name}
-                          className="w-10 h-14 object-cover rounded-lg bg-zinc-950 shrink-0 border border-white/[0.08] group-hover:border-red-500/40 transition-colors"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs sm:text-sm font-bold text-zinc-100 group-hover:text-red-400 transition-colors truncate">
-                            {m.name}
-                          </p>
-                          {m.origin_name && (
-                            <p className="text-[11px] text-zinc-400 truncate italic">
-                              {m.origin_name}
-                            </p>
-                          )}
-                          <div className="flex items-center gap-2 mt-1 text-[10px] text-zinc-400">
-                            {m.year && <span className="text-zinc-300 font-semibold">{m.year}</span>}
-                            {m.quality && (
-                              <span className="px-1.5 py-0.2 rounded bg-red-600/80 text-white font-bold">
-                                {m.quality}
-                              </span>
-                            )}
-                            {m.episode_current && (
-                              <span className="text-amber-400 font-medium truncate">
-                                {m.episode_current}
-                              </span>
-                            )}
-                          </div>
+                  <div className="p-3.5 space-y-3.5">
+                    {/* Recent Searches */}
+                    {recentSearches.length > 0 && (
+                      <div>
+                        <div className="flex items-center justify-between text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-2">
+                          <span className="flex items-center gap-1.5">
+                            <History className="w-3.5 h-3.5 text-zinc-400" />
+                            Tìm kiếm gần đây
+                          </span>
+                          <button
+                            type="button"
+                            onClick={clearRecentSearches}
+                            className="text-[10px] text-zinc-500 hover:text-red-400 transition-colors cursor-pointer"
+                          >
+                            Xóa hết
+                          </button>
                         </div>
-                      </button>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowSuggestions(false);
-                        onSearch(q.trim());
-                      }}
-                      className="w-full p-2.5 text-center text-xs font-bold text-red-400 hover:text-red-300 hover:bg-red-600/10 transition-colors cursor-pointer"
-                    >
-                      Xem tất cả kết quả cho "{q}" →
-                    </button>
+                        <div className="flex flex-wrap gap-1.5">
+                          {recentSearches.map((s) => (
+                            <div
+                              key={s}
+                              onClick={() => handleSelectTag(s)}
+                              className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-xs text-zinc-200 hover:text-white transition-colors cursor-pointer group"
+                            >
+                              <span>{s}</span>
+                              <button
+                                type="button"
+                                onClick={(e) => removeRecentSearch(s, e)}
+                                className="text-zinc-500 hover:text-red-400 p-0.5 cursor-pointer"
+                                title="Xóa"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Trending Searches */}
+                    <div>
+                      <div className="flex items-center gap-1.5 text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-2">
+                        <TrendingUp className="w-3.5 h-3.5 text-red-500" />
+                        Xu hướng tìm kiếm
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {TRENDING_TAGS.map((tag) => (
+                          <button
+                            key={tag}
+                            type="button"
+                            onClick={() => handleSelectTag(tag)}
+                            className="px-2.5 py-1 rounded-xl glass-pill hover:bg-red-600/20 hover:text-red-300 text-xs text-zinc-300 transition-all cursor-pointer border border-white/10"
+                          >
+                            {tag}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
             )}
           </div>
+
+          {/* Random Movie Button (Desktop) */}
+          {onRandomMovie && (
+            <button
+              onClick={onRandomMovie}
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl glass-pill hover:bg-white/15 text-xs font-bold text-amber-300 border border-amber-500/30 hover:border-amber-500/60 transition-all cursor-pointer shadow-sm hover:scale-105 active:scale-95"
+              title="Chọn ngẫu nhiên một bộ phim để xem ngay"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <span className="hidden xl:inline">Phim Ngẫu Nhiên</span>
+            </button>
+          )}
+
+          {/* PWA Install Button (Desktop) */}
+          {canInstallPwa && onInstallPwa && (
+            <button
+              onClick={onInstallPwa}
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-red-600/20 to-rose-600/20 hover:from-red-600/30 hover:to-rose-600/30 text-xs font-bold text-red-400 border border-red-500/40 transition-all cursor-pointer shadow-sm hover:scale-105 active:scale-95"
+              title="Cài đặt ứng dụng CineHub"
+            >
+              <Download className="w-3.5 h-3.5 text-red-400" />
+              <span className="hidden xl:inline">Cài App</span>
+            </button>
+          )}
 
           {/* Mobile menu toggle button */}
           <button
@@ -363,6 +531,28 @@ export const Navbar: React.FC<Props> = ({
             >
               <Bookmark className="w-4 h-4 text-red-400" /> Tủ Phim Đã Lưu
             </button>
+            {onRandomMovie && (
+              <button
+                onClick={() => {
+                  onRandomMovie();
+                  setMenuOpen(false);
+                }}
+                className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-left transition cursor-pointer col-span-2 bg-amber-500/10 text-amber-300 border border-amber-500/30"
+              >
+                <Sparkles className="w-4 h-4 text-amber-400" /> Chọn Phim Ngẫu Nhiên
+              </button>
+            )}
+            {canInstallPwa && onInstallPwa && (
+              <button
+                onClick={() => {
+                  onInstallPwa();
+                  setMenuOpen(false);
+                }}
+                className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-left transition cursor-pointer col-span-2 bg-red-600/20 text-red-400 border border-red-500/40"
+              >
+                <Download className="w-4 h-4 text-red-400" /> Cài Đặt Ứng Dụng (PWA)
+              </button>
+            )}
           </div>
 
           {/* Mobile Genres */}
