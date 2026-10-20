@@ -87,3 +87,41 @@ export function saveHistory(entry: {
 export function clearHistory(): void {
   localStorage.removeItem(HISTORY_KEY);
 }
+
+export function removeHistoryItem(slug: string, episodeSlug?: string): void {
+  try {
+    const list = getHistory();
+    const updated = list.filter((item) =>
+      episodeSlug ? !(item.slug === slug && item.episodeSlug === episodeSlug) : item.slug !== slug
+    );
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
+  } catch (e) {
+    console.error('Failed to remove history item:', e);
+  }
+}
+
+export function exportUserData(): string {
+  const data = {
+    favorites: getFavorites(),
+    history: getHistory(),
+    exportedAt: new Date().toISOString(),
+    version: '1.0',
+  };
+  return JSON.stringify(data, null, 2);
+}
+
+export function importUserData(jsonStr: string): boolean {
+  try {
+    const parsed = JSON.parse(jsonStr);
+    if (Array.isArray(parsed.favorites)) {
+      localStorage.setItem(FAVORITES_KEY, JSON.stringify(parsed.favorites));
+    }
+    if (Array.isArray(parsed.history)) {
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(parsed.history));
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+

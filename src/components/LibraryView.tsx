@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { Bookmark, History, Trash2, Play } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Bookmark, History, Trash2, Play, Download, Upload } from 'lucide-react';
 import type { FavoriteItem, HistoryItem } from '../types';
 import { getImageUrl } from '../services/api';
+import { exportUserData, importUserData } from '../services/storage';
 
 interface Props {
   favorites: FavoriteItem[];
@@ -9,7 +10,9 @@ interface Props {
   onSelectMovie: (slug: string) => void;
   onResumePlay: (h: HistoryItem) => void;
   onRemoveFav: (slug: string) => void;
+  onRemoveHistoryItem: (slug: string, episodeSlug: string) => void;
   onClearHistory: () => void;
+  onDataImported?: () => void;
 }
 
 export const LibraryView: React.FC<Props> = ({
@@ -18,39 +21,96 @@ export const LibraryView: React.FC<Props> = ({
   onSelectMovie,
   onResumePlay,
   onRemoveFav,
+  onRemoveHistoryItem,
   onClearHistory,
+  onDataImported,
 }) => {
   const [tab, setTab] = useState<'favorites' | 'history'>('favorites');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleExport = () => {
+    const dataStr = exportUserData();
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `cinehub-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const content = evt.target?.result as string;
+      if (content && importUserData(content)) {
+        onDataImported?.();
+      } else {
+        alert('File không hợp lệ hoặc sai cấu trúc dữ liệu CineHub!');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 w-full">
-      <div className="flex items-center justify-between border-b border-zinc-800 pb-4 mb-6">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-zinc-800 pb-4 mb-6 gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <button
             onClick={() => setTab('favorites')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold cursor-pointer ${
-              tab === 'favorites' ? 'bg-red-600 text-white' : 'bg-zinc-900 text-zinc-400'
+            className={`flex items-center gap-2 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs sm:text-sm font-bold cursor-pointer transition-colors ${
+              tab === 'favorites' ? 'bg-red-600 text-white' : 'bg-zinc-900 text-zinc-400 hover:text-white'
             }`}
           >
             <Bookmark className="w-4 h-4" /> Đã Lưu ({favorites.length})
           </button>
           <button
             onClick={() => setTab('history')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold cursor-pointer ${
-              tab === 'history' ? 'bg-red-600 text-white' : 'bg-zinc-900 text-zinc-400'
+            className={`flex items-center gap-2 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl text-xs sm:text-sm font-bold cursor-pointer transition-colors ${
+              tab === 'history' ? 'bg-red-600 text-white' : 'bg-zinc-900 text-zinc-400 hover:text-white'
             }`}
           >
             <History className="w-4 h-4" /> Đang Xem ({history.length})
           </button>
         </div>
-        {tab === 'history' && history.length > 0 && (
+
+        <div className="flex items-center gap-2">
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            accept=".json"
+            className="hidden"
+          />
           <button
-            onClick={onClearHistory}
-            className="flex items-center gap-1 text-xs text-zinc-400 hover:text-red-400 px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 cursor-pointer"
+            onClick={handleExport}
+            className="flex items-center gap-1.5 text-xs text-zinc-300 hover:text-white px-2.5 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-zinc-700 cursor-pointer transition-colors"
+            title="Tải file sao lưu JSON về máy"
           >
-            <Trash2 className="w-3.5 h-3.5" /> Xóa lịch sử
+            <Download className="w-3.5 h-3.5 text-zinc-400" />
+            <span className="hidden sm:inline">Sao lưu</span>
           </button>
-        )}
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="flex items-center gap-1.5 text-xs text-zinc-300 hover:text-white px-2.5 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-zinc-700 cursor-pointer transition-colors"
+            title="Khôi phục danh sách từ file JSON"
+          >
+            <Upload className="w-3.5 h-3.5 text-zinc-400" />
+            <span className="hidden sm:inline">Khôi phục</span>
+          </button>
+          {tab === 'history' && history.length > 0 && (
+            <button
+              onClick={onClearHistory}
+              className="flex items-center gap-1 text-xs text-zinc-400 hover:text-red-400 px-2.5 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 cursor-pointer transition-colors"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Xóa tất cả</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {tab === 'favorites' ? (
@@ -98,6 +158,16 @@ export const LibraryView: React.FC<Props> = ({
                   <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
                     <Play className="w-8 h-8 text-white fill-current" />
                   </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRemoveHistoryItem(h.slug, h.episodeSlug);
+                    }}
+                    className="absolute top-2 right-2 p-1.5 rounded-full bg-black/75 hover:bg-red-600 text-white transition-colors cursor-pointer z-10"
+                    title="Xóa tập này khỏi lịch sử"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
                   <div className="absolute bottom-0 inset-x-0 h-1.5 bg-zinc-800">
                     <div className="h-full bg-red-600" style={{ width: `${pct}%` }} />
                   </div>

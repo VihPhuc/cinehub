@@ -8,7 +8,7 @@ import {
   searchMovies,
 } from './services/api';
 import type { MovieDetail, MovieItem, FavoriteItem, HistoryItem } from './types';
-import { getFavorites, getHistory, toggleFavorite, clearHistory } from './services/storage';
+import { getFavorites, getHistory, toggleFavorite, clearHistory, removeHistoryItem } from './services/storage';
 import { Navbar } from './components/Navbar';
 import { HeroBanner } from './components/HeroBanner';
 import { MovieRow } from './components/MovieRow';
@@ -344,10 +344,15 @@ export function App() {
               toggleFavorite({ slug, name: '' });
               refreshStorage();
             }}
+            onRemoveHistoryItem={(slug, epSlug) => {
+              removeHistoryItem(slug, epSlug);
+              refreshStorage();
+            }}
             onClearHistory={() => {
               clearHistory();
               refreshStorage();
             }}
+            onDataImported={refreshStorage}
           />
         )}
 
