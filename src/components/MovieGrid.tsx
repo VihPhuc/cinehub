@@ -29,6 +29,20 @@ export const MovieGrid: React.FC<Props> = ({
   onToggleFav,
 }) => {
   const [jumpPage, setJumpPage] = useState('');
+  const [selectedYear, setSelectedYear] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<'default' | 'name' | 'year'>('default');
+
+  const availableYears = Array.from(
+    new Set(movies.map((m) => m.year).filter(Boolean))
+  ).sort((a, b) => (b as number) - (a as number));
+
+  const displayedMovies = movies
+    .filter((m) => (selectedYear === 'all' ? true : String(m.year) === selectedYear))
+    .sort((a, b) => {
+      if (sortBy === 'name') return a.name.localeCompare(b.name);
+      if (sortBy === 'year') return (b.year || 0) - (a.year || 0);
+      return 0;
+    });
 
   const handleJump = (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,29 +72,66 @@ export const MovieGrid: React.FC<Props> = ({
   };
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 w-full">
-      {title && (
-        <div className="mb-6">
-          <h1 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
-            <span className="w-1.5 h-6 bg-red-600 rounded-full" />
-            {title}
-          </h1>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div>
+          {title && (
+            <h1 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
+              <span className="w-1.5 h-6 bg-red-600 rounded-full" />
+              {title}
+            </h1>
+          )}
           {subtitle && <p className="text-xs sm:text-sm text-zinc-400 mt-1">{subtitle}</p>}
         </div>
-      )}
+
+        {!loading && movies.length > 0 && (
+          <div className="flex items-center gap-2 flex-wrap">
+            {availableYears.length > 1 && (
+              <div className="flex items-center gap-1.5 text-xs text-zinc-400">
+                <span>Năm:</span>
+                <select
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(e.target.value)}
+                  className="bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1 text-white text-xs focus:outline-none focus:border-red-500 cursor-pointer"
+                >
+                  <option value="all">Tất cả năm</option>
+                  {availableYears.map((y) => (
+                    <option key={y} value={String(y)}>
+                      {y}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div className="flex items-center gap-1.5 text-xs text-zinc-400">
+              <span>Sắp xếp:</span>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as any)}
+                className="bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1 text-white text-xs focus:outline-none focus:border-red-500 cursor-pointer"
+              >
+                <option value="default">Mới cập nhật</option>
+                <option value="year">Năm phát hành</option>
+                <option value="name">Tên A-Z</option>
+              </select>
+            </div>
+          </div>
+        )}
+      </div>
 
       {loading ? (
         <div className="h-64 flex flex-col items-center justify-center gap-3 text-zinc-400">
           <Loader2 className="w-8 h-8 animate-spin text-red-500" />
           <span className="text-sm">Đang tải dữ liệu phim...</span>
         </div>
-      ) : movies.length === 0 ? (
+      ) : displayedMovies.length === 0 ? (
         <div className="h-64 flex flex-col items-center justify-center text-zinc-400">
           <p className="text-base font-medium">Không tìm thấy phim nào phù hợp.</p>
           <span className="text-xs text-zinc-500 mt-1">Vui lòng thử tìm kiếm hoặc lọc từ khóa khác.</span>
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
-          {movies.map((m) => (
+          {displayedMovies.map((m) => (
             <MovieCard
               key={m.slug}
               movie={m}

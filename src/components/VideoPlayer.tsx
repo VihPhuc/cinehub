@@ -9,6 +9,9 @@ import {
   RotateCcw,
   Loader2,
   Share2,
+  Moon,
+  Timer,
+  PictureInPicture2,
 } from 'lucide-react';
 import type { MovieDetail } from '../types';
 import { saveHistory, getHistory } from '../services/storage';
@@ -37,6 +40,9 @@ export const VideoPlayer: React.FC<Props> = ({
   const [resumeNotice, setResumeNotice] = useState<string | null>(null);
   const [speed, setSpeed] = useState<number>(1);
   const [epFilter, setEpFilter] = useState<string>('');
+  const [theaterMode, setTheaterMode] = useState<boolean>(false);
+  const [sleepRemaining, setSleepRemaining] = useState<number | null>(null);
+  const [showTimerMenu, setShowTimerMenu] = useState<boolean>(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -72,6 +78,38 @@ export const VideoPlayer: React.FC<Props> = ({
   useEffect(() => {
     onEpChange?.(epIdx);
   }, [epIdx, onEpChange]);
+
+  useEffect(() => {
+    if (sleepRemaining === null) return;
+    if (sleepRemaining <= 0) {
+      if (videoRef.current) videoRef.current.pause();
+      showToast('Đã dừng phát theo hẹn giờ');
+      setSleepRemaining(null);
+      return;
+    }
+    const interval = setInterval(() => {
+      setSleepRemaining((prev) => (prev !== null && prev > 1 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [sleepRemaining, showToast]);
+
+  const setTimer = (mins: number | null) => {
+    setSleepRemaining(mins ? mins * 60 : null);
+    setShowTimerMenu(false);
+    showToast(mins ? `Hẹn giờ tắt sau ${mins} phút` : 'Đã tắt hẹn giờ');
+  };
+
+  const togglePip = async () => {
+    try {
+      if (document.pictureInPictureElement) {
+        await document.exitPictureInPicture();
+      } else if (videoRef.current && document.pictureInPictureEnabled) {
+        await videoRef.current.requestPictureInPicture();
+      }
+    } catch {
+      showToast('Không thể bật PiP cho video này');
+    }
+  };
 
   const handleShare = () => {
     const url = `${window.location.origin}${window.location.pathname}?watch=${movie.slug}&ep=${epIdx}`;
@@ -284,7 +322,71 @@ export const VideoPlayer: React.FC<Props> = ({
           <span className="font-bold text-sm text-zinc-100">{movie.name}</span>
           {ep && <span className="text-red-400 text-xs ml-2">({ep.name})</span>}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Sleep Timer */}
+          <div className="relative">
+            <button
+              onClick={() => setShowTimerMenu(!showTimerMenu)}
+              className={`flex items-center gap-1 px-2 py-1.5 rounded text-xs font-semibold cursor-pointer border transition-colors ${
+                sleepRemaining !== null
+                  ? 'bg-amber-600/20 text-amber-400 border-amber-500/40'
+                  : 'bg-zinc-800 text-zinc-300 border-zinc-700/60 hover:bg-zinc-700'
+              }`}
+              title="Hẹn giờ tắt"
+            >
+              <Timer className="w-3.5 h-3.5 text-amber-400" />
+              <span className="hidden sm:inline">
+                {sleepRemaining !== null ? formatTime(sleepRemaining) : 'Hẹn giờ'}
+              </span>
+            </button>
+            {showTimerMenu && (
+              <div className="absolute right-0 top-full mt-2 w-36 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl p-1 z-50 text-xs">
+                {[15, 30, 45, 60].map((mins) => (
+                  <button
+                    key={mins}
+                    onClick={() => setTimer(mins)}
+                    className="w-full text-left px-2 py-1.5 rounded hover:bg-zinc-800 text-zinc-200 cursor-pointer"
+                  >
+                    Sau {mins} phút
+                  </button>
+                ))}
+                {sleepRemaining !== null && (
+                  <button
+                    onClick={() => setTimer(null)}
+                    className="w-full text-left px-2 py-1.5 rounded text-red-400 hover:bg-red-600/20 cursor-pointer"
+                  >
+                    Hủy hẹn giờ
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Theater Mode */}
+          <button
+            onClick={() => setTheaterMode(!theaterMode)}
+            className={`flex items-center gap-1 px-2 py-1.5 rounded text-xs font-semibold cursor-pointer border transition-colors ${
+              theaterMode
+                ? 'bg-red-600 text-white border-red-500'
+                : 'bg-zinc-800 text-zinc-300 border-zinc-700/60 hover:bg-zinc-700'
+            }`}
+            title="Chế độ rạp phim"
+          >
+            <Moon className="w-3.5 h-3.5" />
+            <span className="hidden md:inline">{theaterMode ? 'Tắt Rạp' : 'Rạp Phim'}</span>
+          </button>
+
+          {/* Picture in Picture */}
+          {mode === 'hls' && (
+            <button
+              onClick={togglePip}
+              className="hidden sm:flex items-center gap-1 px-2 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded text-xs font-semibold cursor-pointer border border-zinc-700/60"
+              title="Cửa sổ nổi (Picture-in-Picture)"
+            >
+              <PictureInPicture2 className="w-3.5 h-3.5" />
+            </button>
+          )}
+
           <button
             onClick={handleShare}
             className="flex items-center gap-1.5 px-2.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white rounded text-xs font-semibold cursor-pointer transition-colors border border-zinc-700/60"
@@ -304,10 +406,14 @@ export const VideoPlayer: React.FC<Props> = ({
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto w-full px-2 sm:px-4 py-4 flex-1 flex flex-col gap-4">
+      <div className={`mx-auto w-full transition-all duration-300 flex-1 flex flex-col gap-4 ${
+        theaterMode ? 'max-w-none px-0 py-0 bg-black' : 'max-w-6xl px-2 sm:px-4 py-4'
+      }`}>
         <div
           ref={containerRef}
-          className="relative aspect-video w-full bg-black rounded-xl overflow-hidden border border-zinc-800 shadow-2xl group"
+          className={`relative aspect-video w-full bg-black overflow-hidden shadow-2xl group ${
+            theaterMode ? 'rounded-none max-h-[82vh]' : 'rounded-xl border border-zinc-800'
+          }`}
         >
           {mode === 'hls' ? (
             <video
@@ -382,21 +488,25 @@ export const VideoPlayer: React.FC<Props> = ({
           )}
         </div>
 
-        {/* Shortcuts bar */}
-        <div className="flex flex-wrap items-center justify-between text-[11px] text-zinc-400 px-1 py-0.5">
-          <div className="flex flex-wrap items-center gap-3">
-            <span><strong className="text-zinc-200">Phím tắt:</strong> [Space/K] Tạm dừng</span>
-            <span>[← / →] Tua 10s</span>
-            <span>[↑ / ↓] Âm lượng</span>
-            <span>[M] Tắt tiếng</span>
-            <span>[F] Toàn màn hình</span>
+        {/* Info & episode section */}
+        <div className={`flex flex-col gap-3 transition-opacity ${
+          theaterMode ? 'max-w-6xl mx-auto w-full px-4 pb-6 opacity-70 hover:opacity-100' : ''
+        }`}>
+          {/* Shortcuts bar */}
+          <div className="flex flex-wrap items-center justify-between text-[11px] text-zinc-400 px-1 py-0.5">
+            <div className="flex flex-wrap items-center gap-3">
+              <span><strong className="text-zinc-200">Phím tắt:</strong> [Space/K] Tạm dừng</span>
+              <span>[← / →] Tua 10s</span>
+              <span>[↑ / ↓] Âm lượng</span>
+              <span>[M] Tắt tiếng</span>
+              <span>[F] Toàn màn hình</span>
+            </div>
+            <div>
+              Nguồn: <span className="text-zinc-200 font-medium">{server?.server_name || 'Mặc định'}</span>
+            </div>
           </div>
-          <div>
-            Nguồn: <span className="text-zinc-200 font-medium">{server?.server_name || 'Mặc định'}</span>
-          </div>
-        </div>
 
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 sm:p-4 space-y-3">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 sm:p-4 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800 pb-3">
             <div className="flex items-center gap-2">
               <Server className="w-4 h-4 text-red-500" />
@@ -490,6 +600,7 @@ export const VideoPlayer: React.FC<Props> = ({
         </div>
       </div>
     </div>
+  </div>
   );
 };
 
