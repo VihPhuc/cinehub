@@ -43,6 +43,108 @@ export function App() {
   const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
   const [history, setHistory] = useState<HistoryItem[]>([]);
 
+  // ponytail: url sync uses native URLSearchParams instead of router package
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const watchSlug = params.get('watch');
+    const epIdxParam = parseInt(params.get('ep') || '0', 10);
+    const infoSlug = params.get('info');
+    const tabParam = params.get('tab');
+    const genreParam = params.get('genre');
+    const genreName = params.get('genreName') || '';
+    const countryParam = params.get('country');
+    const countryName = params.get('countryName') || '';
+    const qParam = params.get('q');
+    const pageParam = parseInt(params.get('page') || '1', 10);
+
+    if (watchSlug) {
+      getMovieDetail(watchSlug).then((d) => {
+        if (d) {
+          setWatchingMovie(d);
+          setWatchEpIdx(isNaN(epIdxParam) ? 0 : epIdxParam);
+        }
+      });
+    } else if (infoSlug) {
+      setSelectedSlug(infoSlug);
+    }
+
+    if (tabParam) setActiveTab(tabParam);
+    if (genreParam) {
+      setGenreFilter({ slug: genreParam, name: genreName });
+      setActiveTab('genre');
+    }
+    if (countryParam) {
+      setCountryFilter({ slug: countryParam, name: countryName });
+      setActiveTab('country');
+    }
+    if (qParam) {
+      setSearchQuery(qParam);
+      setActiveTab('search');
+    }
+    if (pageParam > 1) setCurrentPage(pageParam);
+
+    const onPopState = () => {
+      const p = new URLSearchParams(window.location.search);
+      const wSlug = p.get('watch');
+      const epVal = parseInt(p.get('ep') || '0', 10);
+      const iSlug = p.get('info');
+      const tVal = p.get('tab') || 'home';
+
+      if (wSlug) {
+        getMovieDetail(wSlug).then((d) => {
+          if (d) {
+            setWatchingMovie(d);
+            setWatchEpIdx(isNaN(epVal) ? 0 : epVal);
+          }
+        });
+      } else {
+        setWatchingMovie(null);
+      }
+      setSelectedSlug(iSlug || null);
+      setActiveTab(tVal);
+      if (tVal === 'genre') {
+        setGenreFilter({ slug: p.get('genre') || '', name: p.get('genreName') || '' });
+      }
+      if (tVal === 'country') {
+        setCountryFilter({ slug: p.get('country') || '', name: p.get('countryName') || '' });
+      }
+      if (tVal === 'search') {
+        setSearchQuery(p.get('q') || '');
+      }
+      setCurrentPage(parseInt(p.get('page') || '1', 10));
+    };
+
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (watchingMovie) {
+      params.set('watch', watchingMovie.slug);
+      if (watchEpIdx > 0) params.set('ep', String(watchEpIdx));
+    } else {
+      if (selectedSlug) params.set('info', selectedSlug);
+      if (activeTab !== 'home') params.set('tab', activeTab);
+      if (activeTab === 'genre' && genreFilter.slug) {
+        params.set('genre', genreFilter.slug);
+        params.set('genreName', genreFilter.name);
+      }
+      if (activeTab === 'country' && countryFilter.slug) {
+        params.set('country', countryFilter.slug);
+        params.set('countryName', countryFilter.name);
+      }
+      if (activeTab === 'search' && searchQuery) params.set('q', searchQuery);
+      if (currentPage > 1) params.set('page', String(currentPage));
+    }
+    const newSearch = params.toString();
+    const currentSearch = window.location.search.replace(/^\?/, '');
+    if (newSearch !== currentSearch) {
+      const newUrl = newSearch ? `${window.location.pathname}?${newSearch}` : window.location.pathname;
+      window.history.pushState(null, '', newUrl);
+    }
+  }, [watchingMovie, watchEpIdx, selectedSlug, activeTab, genreFilter, countryFilter, searchQuery, currentPage]);
+
   const refreshStorage = () => {
     setFavorites(getFavorites());
     setHistory(getHistory());
@@ -135,6 +237,7 @@ export function App() {
         movie={watchingMovie}
         initialServerIdx={watchServerIdx}
         initialEpIdx={watchEpIdx}
+        onEpChange={(idx) => setWatchEpIdx(idx)}
         onBack={() => {
           setWatchingMovie(null);
           refreshStorage();
@@ -166,6 +269,7 @@ export function App() {
           setCurrentPage(1);
           setActiveTab('country');
         }}
+        onSelectMovie={(slug) => setSelectedSlug(slug)}
       />
 
       <main className="flex-1 pb-16">

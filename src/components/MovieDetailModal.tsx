@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { X, Play, Bookmark, Star, Calendar, Clock, Loader2 } from 'lucide-react';
+import { X, Play, Bookmark, Star, Calendar, Clock, Loader2, Share2, Check } from 'lucide-react';
 import type { MovieDetail } from '../types';
 import { getImageUrl, getMovieDetail } from '../services/api';
 
@@ -20,6 +20,15 @@ export const MovieDetailModal: React.FC<Props> = ({
 }) => {
   const [movie, setMovie] = useState<MovieDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [copied, setCopied] = useState(false);
+
+  const handleShare = () => {
+    const url = `${window.location.origin}${window.location.pathname}?info=${movie?.slug || slug}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
 
   useEffect(() => {
     let ok = true;
@@ -86,6 +95,18 @@ export const MovieDetailModal: React.FC<Props> = ({
             >
               <Bookmark className={`w-4 h-4 ${isFav ? 'fill-current' : ''}`} />
               {isFav ? 'Đã Lưu' : 'Thêm Vào Tủ'}
+            </button>
+            <button
+              onClick={handleShare}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border cursor-pointer transition-colors ${
+                copied
+                  ? 'bg-emerald-600/20 text-emerald-400 border-emerald-500/40'
+                  : 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-700'
+              }`}
+              title="Sao chép liên kết thông tin phim"
+            >
+              {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Share2 className="w-4 h-4" />}
+              {copied ? 'Đã Sao Chép Link' : 'Chia Sẻ'}
             </button>
           </div>
 

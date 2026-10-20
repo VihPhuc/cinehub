@@ -8,6 +8,7 @@ import {
   AlertCircle,
   RotateCcw,
   Loader2,
+  Share2,
 } from 'lucide-react';
 import type { MovieDetail } from '../types';
 import { saveHistory, getHistory } from '../services/storage';
@@ -16,6 +17,7 @@ interface Props {
   movie: MovieDetail;
   initialServerIdx?: number;
   initialEpIdx?: number;
+  onEpChange?: (epIdx: number) => void;
   onBack: () => void;
 }
 
@@ -23,6 +25,7 @@ export const VideoPlayer: React.FC<Props> = ({
   movie,
   initialServerIdx = 0,
   initialEpIdx = 0,
+  onEpChange,
   onBack,
 }) => {
   const [serverIdx, setServerIdx] = useState(initialServerIdx);
@@ -55,6 +58,19 @@ export const VideoPlayer: React.FC<Props> = ({
       if (idx >= 0) setEpIdx(idx);
     }
   }, [movie.slug]);
+
+  useEffect(() => {
+    onEpChange?.(epIdx);
+  }, [epIdx, onEpChange]);
+
+  const handleShare = () => {
+    const url = `${window.location.origin}${window.location.pathname}?watch=${movie.slug}&ep=${epIdx}`;
+    navigator.clipboard.writeText(url).then(() => {
+      showToast('Đã sao chép liên kết tập phim!');
+    }).catch(() => {
+      showToast('Không thể sao chép');
+    });
+  };
 
   const formatTime = (secs: number) => {
     const m = Math.floor(secs / 60);
@@ -255,7 +271,15 @@ export const VideoPlayer: React.FC<Props> = ({
           <span className="font-bold text-sm text-zinc-100">{movie.name}</span>
           {ep && <span className="text-red-400 text-xs ml-2">({ep.name})</span>}
         </div>
-        <div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleShare}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white rounded text-xs font-semibold cursor-pointer transition-colors border border-zinc-700/60"
+            title="Sao chép liên kết tập phim"
+          >
+            <Share2 className="w-3.5 h-3.5 text-zinc-400" />
+            <span className="hidden sm:inline">Chia sẻ</span>
+          </button>
           {hasNext && (
             <button
               onClick={() => setEpIdx(epIdx + 1)}
