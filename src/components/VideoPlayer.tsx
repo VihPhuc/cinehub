@@ -14,6 +14,7 @@ import {
   PictureInPicture2,
   HelpCircle,
   X,
+  Check,
 } from 'lucide-react';
 import type { MovieDetail } from '../types';
 import { saveHistory, getHistory } from '../services/storage';
@@ -46,9 +47,14 @@ export const VideoPlayer: React.FC<Props> = ({
   const [sleepRemaining, setSleepRemaining] = useState<number | null>(null);
   const [showTimerMenu, setShowTimerMenu] = useState<boolean>(false);
   const [showShortcutsModal, setShowShortcutsModal] = useState<boolean>(false);
+  const [qualities, setQualities] = useState<{ id: number; height: number; bitrate: number }[]>([]);
+  const [currentQuality, setCurrentQuality] = useState<number>(-1);
+  const [autoNextCountdown, setAutoNextCountdown] = useState<number | null>(null);
+  const [watchedEpSlugs, setWatchedEpSlugs] = useState<string[]>([]);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const hlsInstanceRef = useRef<Hls | null>(null);
   const toastTimeoutRef = useRef<number | null>(null);
 
   const server = movie.episodes?.[serverIdx] || movie.episodes?.[0];
@@ -63,11 +69,43 @@ export const VideoPlayer: React.FC<Props> = ({
     showToast(`Tốc độ phát: ${s}x`);
   };
 
+  const changeQuality = (lvlIndex: number) => {
+    if (hlsInstanceRef.current) {
+      hlsInstanceRef.current.currentLevel = lvlIndex;
+      setCurrentQuality(lvlIndex);
+      const matched = qualities.find((q) => q.id === lvlIndex);
+      const label = lvlIndex === -1 ? 'Tự động' : `${matched?.height || lvlIndex}p`;
+      showToast(`Độ phân giải: ${label}`);
+    }
+  };
+
   const showToast = useCallback((msg: string) => {
     setToastMsg(msg);
     if (toastTimeoutRef.current) window.clearTimeout(toastTimeoutRef.current);
     toastTimeoutRef.current = window.setTimeout(() => setToastMsg(null), 1500);
   }, []);
+
+  useEffect(() => {
+    const list = getHistory();
+    const slugs = list.filter((h) => h.slug === movie.slug).map((h) => h.episodeSlug);
+    setWatchedEpSlugs(slugs);
+    setAutoNextCountdown(null);
+  }, [movie.slug, epIdx]);
+
+  useEffect(() => {
+    if (autoNextCountdown === null) return;
+    if (autoNextCountdown <= 0) {
+      setAutoNextCountdown(null);
+      if (hasNext) {
+        setEpIdx((prev) => prev + 1);
+      }
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setAutoNextCountdown((prev) => (prev !== null ? prev - 1 : null));
+    }, 1000);
+    return () => window.clearTimeout(timer);
+  }, [autoNextCountdown, hasNext]);
 
   useEffect(() => {
     const history = getHistory();
@@ -143,6 +181,9 @@ export const VideoPlayer: React.FC<Props> = ({
     const video = videoRef.current;
     if (!video) return;
 
+    setQualities([]);
+    setCurrentQuality(-1);
+
     let hls: Hls | null = null;
     setMode('hls');
 
@@ -152,12 +193,22 @@ export const VideoPlayer: React.FC<Props> = ({
         lowLatencyMode: false,
         backBufferLength: 90,
       });
+      hlsInstanceRef.current = hls;
 
       hls.loadSource(ep.link_m3u8);
       hls.attachMedia(video);
 
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         setLoading(false);
+        if (hls && hls.levels && hls.levels.length > 0) {
+          const list = hls.levels.map((lvl, index) => ({
+            id: index,
+            height: lvl.height,
+            bitrate: lvl.bitrate,
+          }));
+          setQualities(list);
+          setCurrentQuality(hls.currentLevel);
+        }
         if (videoRef.current) {
           videoRef.current.playbackRate = speed;
         }
@@ -182,6 +233,7 @@ export const VideoPlayer: React.FC<Props> = ({
               break;
             default:
               hls?.destroy();
+              hlsInstanceRef.current = null;
               setErrorMsg('Không thể giải mã luồng HLS. Bạn có thể thử lại hoặc đổi sang iframe embed.');
               setLoading(false);
               break;
@@ -198,7 +250,10 @@ export const VideoPlayer: React.FC<Props> = ({
     }
 
     return () => {
-      if (hls) hls.destroy();
+      if (hls) {
+        hls.destroy();
+        hlsInstanceRef.current = null;
+      }
     };
   }, [ep, movie.slug]);
 
@@ -228,8 +283,7 @@ export const VideoPlayer: React.FC<Props> = ({
 
     const onEnded = () => {
       if (hasNext) {
-        showToast('Chuyển sang tập tiếp theo...');
-        setEpIdx((prev) => prev + 1);
+        setAutoNextCountdown(5);
       }
     };
 
@@ -504,6 +558,36 @@ export const VideoPlayer: React.FC<Props> = ({
               </div>
             </div>
           )}
+
+          {/* Auto Next Episode Countdown Overlay */}
+          {autoNextCountdown !== null && hasNext && (
+            <div className="absolute inset-0 bg-black/85 backdrop-blur-sm z-30 flex flex-col items-center justify-center p-6 text-center animate-in fade-in">
+              <span className="text-zinc-400 text-xs uppercase tracking-wider font-semibold mb-2">Tập tiếp theo sẽ phát sau</span>
+              <div className="text-5xl font-extrabold text-red-500 font-mono mb-2">
+                {autoNextCountdown}s
+              </div>
+              <p className="text-white text-sm font-semibold max-w-sm truncate mb-5">
+                {server?.server_data?.[epIdx + 1]?.name}
+              </p>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setAutoNextCountdown(null)}
+                  className="px-3.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-semibold cursor-pointer border border-zinc-700 transition"
+                >
+                  Hủy chuyển tập
+                </button>
+                <button
+                  onClick={() => {
+                    setAutoNextCountdown(null);
+                    setEpIdx((prev) => prev + 1);
+                  }}
+                  className="px-4 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-bold cursor-pointer transition shadow-lg shadow-red-600/30 flex items-center gap-1.5"
+                >
+                  Phát ngay <SkipForward className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Info & episode section */}
@@ -545,6 +629,24 @@ export const VideoPlayer: React.FC<Props> = ({
             </div>
 
             <div className="flex items-center gap-2 flex-wrap">
+              {mode === 'hls' && qualities.length > 0 && (
+                <div className="flex items-center gap-1 bg-zinc-800/80 border border-zinc-700/80 rounded-lg px-2 py-0.5">
+                  <span className="text-[11px] text-zinc-400 font-semibold">Chất lượng:</span>
+                  <select
+                    value={currentQuality}
+                    onChange={(e) => changeQuality(Number(e.target.value))}
+                    className="bg-zinc-800 text-white text-[11px] font-semibold outline-none cursor-pointer py-0.5"
+                  >
+                    <option value={-1}>Tự động</option>
+                    {qualities.map((q) => (
+                      <option key={q.id} value={q.id}>
+                        {q.height ? `${q.height}p` : `Luồng ${q.id + 1}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               {mode === 'hls' && (
                 <div className="flex items-center gap-1 bg-zinc-800/80 border border-zinc-700/80 rounded-lg p-0.5">
                   <span className="text-[11px] text-zinc-400 px-1.5 font-semibold">Tốc độ:</span>
@@ -603,13 +705,16 @@ export const VideoPlayer: React.FC<Props> = ({
                     <button
                       key={e.slug}
                       onClick={() => setEpIdx(idx)}
-                      className={`py-1.5 px-1 rounded text-xs font-medium border truncate cursor-pointer transition-colors ${
+                      className={`relative py-1.5 px-1 rounded text-xs font-medium border truncate cursor-pointer transition-colors flex items-center justify-center gap-1 ${
                         epIdx === idx
                           ? 'bg-red-600 border-red-500 text-white font-bold'
                           : 'bg-zinc-800 border-zinc-700/60 text-zinc-300 hover:bg-zinc-700'
                       }`}
                     >
-                      {e.name}
+                      <span>{e.name}</span>
+                      {watchedEpSlugs.includes(e.slug) && epIdx !== idx && (
+                        <Check className="w-2.5 h-2.5 text-emerald-400 shrink-0" />
+                      )}
                     </button>
                   ))}
               </div>
