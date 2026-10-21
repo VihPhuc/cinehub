@@ -1,32 +1,88 @@
-# React + TypeScript + Vite
+# CineHub
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Ứng dụng xem phim trực tuyến (SPA) xây dựng bằng React + TypeScript + Vite + Tailwind CSS.
 
-Currently, two official plugins are available:
+- Duyệt phim lẻ, phim bộ, anime, TV shows; tìm kiếm và lọc theo thể loại/quốc gia.
+- Xem HLS bằng `hls.js`, fallback iframe cho server không có m3u8.
+- Lưu phim yêu thích, lịch sử xem và thời gian phát; hỗ trợ sao lưu/khôi phục JSON.
+- PWA: cài đặt, offline app shell, cache API/ảnh có giới hạn và TTL.
+- Deep link chia sẻ được trạng thái tab, tìm kiếm, phim đang xem và tập phim.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Chạy local
 
-## React Compiler
+Yêu cầu Node.js 22+ (khuyến nghị) và npm.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm ci
+npm run dev        # http://localhost:5173
+npm run build      # tsc -b + vite build -> dist/
+npm run preview    # chạy thử bản production
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+## Kiểm tra chất lượng
+
+```bash
+npm test               # Vitest: data/cache/URL/SW
+npm run lint           # Oxlint
+npm run build          # type-check + production build
+npm run check:bundle   # chặn hls.js bị preload lại vào bundle đầu
+npm run check:deploy   # kiểm tra _headers/_redirects được sinh ra
+npm run check:mojibake # phát hiện lỗi encoding trong source
+```
+
+CI tại `.github/workflows/verify.yml` chạy toàn bộ các bước trên khi push/PR.
+
+## Cấu trúc chính
+
+```text
+src/
+  App.tsx                 URL state, điều hướng, tải dữ liệu
+  components/             Hero, grid/row, modal chi tiết, player, navbar...
+  services/
+    api.ts                PhimAPI client, cache, dedup, timeout
+    tmdb.ts               tạo URL embed VidSrc từ metadata TMDB
+    storage.ts            favorites/history/backup có validate
+    validation.ts         schema, URL an toàn, giới hạn dữ liệu
+  lib/
+    urlState.ts           parse/serialize query string
+    hlsRecovery.ts        policy retry cho HLS
+  main.tsx                mount app + đăng ký service worker (PROD)
+public/
+  sw.js                   app shell + API + image runtime cache
+  manifest.json           PWA manifest
+scripts/                  bundle/deploy/encoding guards
+```
+
+### URL state
+
+Các tham số được hỗ trợ: `tab`, `genre`, `country`, `q`, `page`, `info`, `watch`, `ep`.
+`src/lib/urlState.ts` chịu trách nhiệm parse, giới hạn giá trị và serialize; `App.tsx`
+đồng bộ state với `history.pushState` và xử lý `popstate`/back-forward.
+
+## Dữ liệu và cache
+
+- API: `https://phimapi.com`; ảnh: `https://phimimg.com`.
+- Cache API trong bộ nhớ + `sessionStorage`, TTL 4 phút; request trùng được dedup.
+- Service worker dùng cache có version:
+  - `cinehub-shell-v4` — app shell
+  - `cinehub-api-v3` — API, TTL 4 phút, dữ liệu hết hạn chỉ dùng offline
+  - `cinehub-images-v1` — ảnh, giới hạn số entry
+- Khi deploy thay đổi asset, bump version cache trong `public/sw.js`.
+
+## Bảo mật
+
+- HTML mô tả phim được sanitize bằng DOMPurify trước khi render.
+- URL stream/embed được validate; iframe có `sandbox`, `referrerPolicy`.
+- CSP production được inject vào `index.html` và sinh thêm `dist/_headers`.
+- `dist/_headers` / `dist/_redirects` dành cho host hỗ trợ định dạng này
+  (Netlify, Cloudflare Pages). Với Vercel/GitHub Pages hoặc reverse proxy, cấu hình
+  tương đương ở tầng host.
+- Các header gồm CSP, `frame-ancestors 'none'`, `X-Frame-Options: DENY`,
+  `X-Content-Type-Options: nosniff`, Referrer Policy, Permissions Policy và HSTS.
+
+## Lưu ý
+
+- Dữ liệu đến từ API bên thứ ba nên schema có thể thay đổi; các trường không hợp lệ
+  được bỏ qua thay vì làm crash UI.
+- HLS/iframe, retry, fullscreen và PiP cần được kiểm tra thêm trên thiết bị/network thật.
+- Player/HLS chunk chỉ được service worker cache sau lần đầu mở một phim.

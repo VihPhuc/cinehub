@@ -1,182 +1,355 @@
-import React, { useState, useEffect } from 'react';
-import { Play, Pause, Info, Star, ChevronLeft, ChevronRight, Flame } from 'lucide-react';
-import type { MovieItem } from '../types';
-import { getImageUrl, prefetchMovieDetail } from '../services/api';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Play, Info, Heart, Star, ChevronLeft, ChevronRight, Video, X } from 'lucide-react';
+import type { MovieItem, MovieDetail } from '../types';
+import { getImageUrl, prefetchMovieDetail, getMovieDetail, formatMovieTitle } from '../services/api';
+
+function getYouTubeId(url?: string): string | null {
+  if (!url) return null;
+  const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
+  return match ? match[1] : null;
+}
+
+function parseTitleWithSeason(title: string): { main: string; season: string | null } {
+  if (!title) return { main: '', season: null };
+  const seasonMatch = title.match(/\s*(\((?:Phần|Season|Mùa|Part)\s*\d+[^)]*\)|(?:Phần|Season|Mùa|Part)\s*\d+)/i);
+  if (!seasonMatch) return { main: title.trim(), season: null };
+  return {
+    main: title.replace(seasonMatch[0], '').trim(),
+    season: seasonMatch[1].replace(/[()]/g, '').trim(),
+  };
+}
 
 interface Props {
   movies: MovieItem[];
   onPlay: (movie: MovieItem) => void;
   onInfo: (movie: MovieItem) => void;
+  favorites?: string[];
+  onToggleFav?: (movie: MovieItem) => void;
 }
 
-export const HeroBanner: React.FC<Props> = ({ movies, onPlay, onInfo }) => {
+export const HeroBanner: React.FC<Props> = ({
+  movies,
+  onPlay,
+  onInfo,
+  favorites = [],
+  onToggleFav,
+}) => {
   const [index, setIndex] = useState(0);
-  const [isAutoPlay, setIsAutoPlay] = useState(true);
-  const [isHovered, setIsHovered] = useState(false);
-  const maxSlides = Math.min(movies.length, 6);
-
-  // Auto rotate banner every 7s if not paused or hovered
-  useEffect(() => {
-    if (maxSlides <= 1 || !isAutoPlay || isHovered) return;
-    const interval = setInterval(() => {
-      setIndex((prev) => (prev + 1) % maxSlides);
-    }, 7000);
-    return () => clearInterval(interval);
-  }, [maxSlides, isAutoPlay, isHovered]);
+  const [detailMap, setDetailMap] = useState<Record<string, MovieDetail>>({});
+  const [showTrailerModal, setShowTrailerModal] = useState(false);
+  const maxSlides = Math.min(movies.length, 8);
 
   const current = movies[index] || movies[0];
   const currentSlug = current?.slug;
+  const activeDetail = currentSlug ? detailMap[currentSlug] : null;
+  const trailerId = getYouTubeId(activeDetail?.trailer_url);
 
+  // Fetch active slide detail and prefetch next slide detail
   useEffect(() => {
-    if (currentSlug) {
-      prefetchMovieDetail(currentSlug);
+    if (!currentSlug) return;
+    let active = true;
+
+    if (!detailMap[currentSlug]) {
+      getMovieDetail(currentSlug).then((d) => {
+        if (active && d) {
+          setDetailMap((prev) => ({ ...prev, [currentSlug]: d }));
+        }
+      });
     }
-  }, [currentSlug]);
+
+    // Prefetch the next slide
+    const nextMovie = movies[(index + 1) % maxSlides];
+    if (nextMovie?.slug && !detailMap[nextMovie.slug]) {
+      prefetchMovieDetail(nextMovie.slug);
+      getMovieDetail(nextMovie.slug).then((d) => {
+        if (active && d) {
+          setDetailMap((prev) => ({ ...prev, [nextMovie.slug]: d }));
+        }
+      });
+    }
+
+    return () => {
+      active = false;
+    };
+  }, [currentSlug, index, maxSlides, movies, detailMap]);
+
+  const handleNext = useCallback(() => {
+    setIndex((prev) => (prev + 1) % maxSlides);
+  }, [maxSlides]);
+
+  const handlePrev = useCallback(() => {
+    setIndex((prev) => (prev - 1 + maxSlides) % maxSlides);
+  }, [maxSlides]);
+
+  const handleSelect = useCallback((newIndex: number) => {
+    setIndex(newIndex);
+  }, []);
+
+  // Uninterrupted auto-slide every 5 seconds: advances slide reliably without stopping
+  useEffect(() => {
+    if (maxSlides <= 1 || showTrailerModal) return;
+
+    const interval = setInterval(() => {
+      setIndex((prev) => (prev + 1) % maxSlides);
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [maxSlides, showTrailerModal]);
 
   if (!movies.length || !current) return null;
-  const bg = getImageUrl(current.poster_url || current.thumb_url);
+
+  const movieTitle = formatMovieTitle(current.name);
+  const parsedTitle = parseTitleWithSeason(movieTitle);
+  const bg = getImageUrl(current.thumb_url || current.poster_url);
+  const isFav = favorites.includes(current.slug);
+  const plainSynopsis = activeDetail?.content
+    ? activeDetail.content.replace(/<[^>]*>?/gm, '').trim()
+    : '';
+
+  const countryName = activeDetail?.country?.[0]?.name || current.country?.[0]?.name;
+  const topKicker = countryName
+    ? `PHIM ${countryName.toUpperCase()} HÀNG ĐẦU`
+    : 'PHIM ĐỀ XUẤT HÀNG ĐẦU';
+
+  const episodeInfo =
+    activeDetail?.episode_current ||
+    (activeDetail?.episode_total ? `Tập ${activeDetail.episode_total}` : null) ||
+    current.quality ||
+    'Full HD';
 
   return (
-    <div
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      className="relative w-full h-[480px] sm:h-[580px] lg:h-[650px] overflow-hidden bg-[#090a0f] group"
-    >
-      {/* Background Poster Image */}
+    <div className="relative w-full h-[540px] sm:h-[640px] lg:h-[720px] overflow-hidden bg-[#07080d] select-none">
+      {/* Background Poster Image: Crisp, bright, high-contrast and 100% free of YouTube controls */}
       <div className="absolute inset-0">
         <img
           key={current.slug}
           src={bg}
-          alt={current.name}
-          className="w-full h-full object-cover object-top sm:object-center filter brightness-[0.4] transition-all duration-1000 ease-out scale-105 animate-in fade-in zoom-in-95"
+          alt={movieTitle}
+          fetchPriority="high"
+          className="w-full h-full object-cover object-center filter brightness-[0.96] contrast-[1.06] saturate-[1.12] transition-all duration-1000 ease-out scale-100"
         />
-        {/* Cinematic gradient overlays */}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#090a0f] via-[#090a0f]/60 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#090a0f] via-[#090a0f]/75 sm:via-[#090a0f]/40 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-transparent" />
       </div>
 
-      {/* Hero Content Container */}
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 h-full flex flex-col justify-end pb-14 sm:pb-16">
-        <div className="max-w-2xl sm:max-w-3xl space-y-4">
-          {/* Top Badges */}
-          <div className="flex items-center flex-wrap gap-2 text-xs font-bold">
-            <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-red-600 to-rose-600 text-white shadow-lg shadow-red-600/30 uppercase tracking-wider text-[11px]">
-              <Flame className="w-3.5 h-3.5 fill-current" />
-              TOP Nổi Bật
-            </span>
-            {current.quality && (
-              <span className="px-2.5 py-1 rounded-full glass-pill text-zinc-100 font-extrabold uppercase text-[11px] border border-white/15">
-                {current.quality}
-              </span>
-            )}
-            {current.year && (
-              <span className="px-2.5 py-1 rounded-full glass-pill text-zinc-300 font-medium text-[11px]">
-                {current.year}
-              </span>
-            )}
-            {current.tmdb?.vote_average ? (
-              <span className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 font-bold text-[11px]">
-                <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                {current.tmdb.vote_average.toFixed(1)} TMDB
-              </span>
-            ) : null}
-          </div>
+      {/* Cinematic Ambient Gradients:
+          - Left: Deep, smooth protection for text and action dock
+          - Bottom: Soft fade into page background
+          - Top: Subtle header fade for navbar readability
+          - Right: 100% crystal clear so characters and scene shine brightly
+      */}
+      <div className="absolute inset-0 bg-gradient-to-r from-[#07080d]/90 via-[#07080d]/60 via-35% md:via-[#07080d]/25 to-transparent pointer-events-none" />
+      <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-[#07080d] via-[#07080d]/40 to-transparent pointer-events-none" />
+      <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-[#07080d]/60 via-transparent to-transparent pointer-events-none" />
 
-          {/* Title and Origin Name */}
-          <div className="space-y-1">
-            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-white font-heading tracking-tight drop-shadow-2xl leading-none sm:leading-tight">
-              {current.name}
+      {/* Main Container: Full-width Cinematic Hero Info */}
+      <div className="relative z-10 w-full max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 h-full flex items-end pb-16 sm:pb-20">
+        {/* Hero Information */}
+        <div className="flex-1 max-w-xl sm:max-w-2xl lg:max-w-3xl space-y-3.5 sm:space-y-4">
+          {/* Top Category Kicker */}
+          <p className="text-[11px] sm:text-xs font-extrabold uppercase tracking-[0.2em] text-white/90 drop-shadow-md">
+            {topKicker}
+          </p>
+
+          {/* Main Title & English Origin Subtitle with Non-breaking Season Badge */}
+          <div className="space-y-1 sm:space-y-1.5">
+            <h1 className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-black text-white font-heading tracking-tight leading-[1.12] drop-shadow-[0_4px_24px_rgba(0,0,0,0.95)]">
+              {parsedTitle.main}
+              {parsedTitle.season && (
+                <span className="inline-block whitespace-nowrap ml-2.5 text-xl sm:text-3xl lg:text-4xl font-bold text-amber-400/95 align-baseline">
+                  ({parsedTitle.season})
+                </span>
+              )}
             </h1>
             {current.origin_name && (
-              <p className="text-sm sm:text-lg text-zinc-300/90 font-medium italic drop-shadow-md">
+              <p className="text-xs sm:text-sm md:text-base font-semibold text-amber-400/95 tracking-wide drop-shadow">
                 {current.origin_name}
               </p>
             )}
           </div>
 
-          {/* Category Pills */}
-          {current.category && current.category.length > 0 && (
-            <div className="flex flex-wrap gap-2 pt-0.5">
-              {current.category.slice(0, 4).map((c) => (
-                <span
-                  key={c.slug}
-                  className="px-3 py-1 rounded-lg glass-pill text-xs font-medium text-zinc-300"
-                >
-                  {c.name}
-                </span>
-              ))}
-            </div>
+          {/* Minimalist Outlined Metadata Badges */}
+          <div className="flex items-center flex-wrap gap-2 text-xs">
+            {current.year && (
+              <span className="px-2.5 py-0.5 rounded-md border border-white/30 bg-black/35 backdrop-blur-sm text-white/90 font-semibold text-[11px] sm:text-xs">
+                {current.year}
+              </span>
+            )}
+            {countryName && (
+              <span className="px-2.5 py-0.5 rounded-md border border-white/30 bg-black/35 backdrop-blur-sm text-white/90 font-semibold text-[11px] sm:text-xs">
+                {countryName}
+              </span>
+            )}
+            {parsedTitle.season && (
+              <span className="px-2.5 py-0.5 rounded-md border border-amber-400/40 bg-amber-500/10 backdrop-blur-sm text-amber-300 font-bold text-[11px] sm:text-xs">
+                {parsedTitle.season}
+              </span>
+            )}
+            {episodeInfo && (
+              <span className="px-2.5 py-0.5 rounded-md border border-white/30 bg-black/35 backdrop-blur-sm text-white/90 font-semibold text-[11px] sm:text-xs">
+                {episodeInfo}
+              </span>
+            )}
+            {current.tmdb?.vote_average ? (
+              <span className="px-2.5 py-0.5 rounded-md border border-amber-400/40 bg-black/35 backdrop-blur-sm text-amber-300 font-bold text-[11px] sm:text-xs flex items-center gap-1">
+                <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                {current.tmdb.vote_average.toFixed(1)} TMDB
+              </span>
+            ) : null}
+          </div>
+
+          {/* Plot Synopsis Teaser */}
+          {plainSynopsis && (
+            <p className="text-xs sm:text-sm text-zinc-200/95 leading-relaxed line-clamp-2 max-w-xl font-normal drop-shadow">
+              {plainSynopsis}
+            </p>
           )}
 
-          {/* Action Buttons */}
-          <div className="flex items-center gap-3.5 pt-2">
+          {/* Action Controls: Circular Play Button + Capsule Dock */}
+          <div className="flex items-center gap-3.5 pt-2 sm:pt-3">
+            {/* Big Circular Golden Play Button */}
             <button
+              type="button"
               onClick={() => onPlay(current)}
-              className="flex items-center gap-2.5 px-7 py-3 rounded-xl bg-gradient-to-r from-red-600 via-rose-600 to-red-600 hover:from-red-500 hover:to-rose-500 text-white font-extrabold text-sm sm:text-base glow-red transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer shadow-xl"
+              className="w-13 h-13 sm:w-16 sm:h-16 rounded-full bg-gradient-to-tr from-amber-500 via-amber-400 to-yellow-300 hover:brightness-110 active:scale-95 text-black shadow-xl shadow-amber-500/30 flex items-center justify-center cursor-pointer transition-all duration-300 hover:scale-105"
+              aria-label={`Xem ngay phim ${movieTitle}`}
+              title="Xem Ngay"
             >
-              <Play className="w-4 h-4 sm:w-5 sm:h-5 fill-current" />
-              Xem Ngay
+              <Play className="w-6 h-6 sm:w-7 sm:h-7 fill-black text-black ml-0.5" />
             </button>
-            <button
-              onClick={() => onInfo(current)}
-              className="flex items-center gap-2 px-5 py-3 rounded-xl glass-pill hover:bg-white/15 text-white font-bold text-sm sm:text-base transition-all duration-200 cursor-pointer border border-white/15 hover:border-white/30"
-            >
-              <Info className="w-4 h-4 sm:w-5 sm:h-5 text-zinc-300" />
-              Chi Tiết
-            </button>
+
+            {/* Sleek Pill Capsule Dock (Matching Reference Image) */}
+            <div className="rounded-full bg-black/60 backdrop-blur-xl border border-white/20 px-3 sm:px-5 py-2 sm:py-2.5 flex items-center gap-3 sm:gap-5 shadow-2xl">
+              {/* Heart / Favorite */}
+              {onToggleFav && (
+                <button
+                  type="button"
+                  onClick={() => onToggleFav(current)}
+                  className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full text-zinc-300 hover:text-white hover:bg-white/10 transition-transform active:scale-90 cursor-pointer focus-visible:ring-2 focus-visible:ring-amber-400"
+                  aria-label={isFav ? 'Bỏ yêu thích' : 'Yêu thích'}
+                  title={isFav ? 'Bỏ yêu thích' : 'Yêu thích'}
+                >
+                  <Heart className={`w-5 h-5 transition-colors ${isFav ? 'fill-red-500 text-red-500' : 'text-white hover:text-red-400'}`} />
+                </button>
+              )}
+
+              {/* Info */}
+              <button
+                type="button"
+                onClick={() => onInfo(current)}
+                className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full text-zinc-300 hover:text-white hover:bg-white/10 transition-transform active:scale-90 cursor-pointer focus-visible:ring-2 focus-visible:ring-amber-400"
+                aria-label={`Xem chi tiết phim ${movieTitle}`}
+                title="Xem chi tiết"
+              >
+                <Info className="w-5 h-5 text-white" />
+              </button>
+
+              {/* Trailer Button */}
+              {trailerId && (
+                <button
+                  type="button"
+                  onClick={() => setShowTrailerModal(true)}
+                  className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full text-zinc-300 hover:text-white hover:bg-white/10 transition-transform active:scale-90 cursor-pointer focus-visible:ring-2 focus-visible:ring-amber-400"
+                  aria-label="Xem trailer phim"
+                  title="Xem trailer"
+                >
+                  <Video className="w-5 h-5 text-amber-400 hover:text-amber-300" />
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Slide Indicators & Chevron Navigation */}
+      {/* Floating Bottom-Right Slide Controls: Dash Indicators + Circular Outline Arrows */}
       {maxSlides > 1 && (
-        <div className="absolute bottom-6 right-4 sm:right-6 z-20 flex items-center gap-4">
-          {/* Progress / Dot Indicators */}
-          <div className="flex items-center gap-1.5">
-            {movies.slice(0, maxSlides).map((m, i) => (
-              <button
-                key={m.slug || i}
-                onClick={() => setIndex(i)}
-                className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${
-                  index === i
-                    ? 'w-7 bg-red-500 shadow-md shadow-red-500/50'
-                    : 'w-2 bg-white/30 hover:bg-white/60'
-                }`}
-                title={m.name}
-                aria-label={`Slide ${i + 1}`}
-              />
-            ))}
+        <div className="absolute bottom-6 sm:bottom-8 right-4 sm:right-8 z-20 flex items-center gap-4 sm:gap-6">
+          {/* Dash Pagination Indicators */}
+          <div className="flex items-center gap-1 sm:gap-1.5" role="tablist" aria-label="Danh sách phim nổi bật">
+            {movies.slice(0, maxSlides).map((m, i) => {
+              const isActive = index === i;
+              return (
+                <button
+                  key={m.slug || i}
+                  role="tab"
+                  aria-selected={isActive}
+                  onClick={() => handleSelect(i)}
+                  className="py-3 px-1 min-h-[44px] min-w-[28px] sm:min-w-[32px] flex items-center justify-center cursor-pointer group focus-visible:ring-1 focus-visible:ring-amber-400 focus-visible:outline-none rounded"
+                  title={formatMovieTitle(m.name)}
+                  aria-label={`Chuyển tới phim ${formatMovieTitle(m.name)}`}
+                >
+                  <span
+                    className={`relative block h-1 sm:h-1.5 rounded-full overflow-hidden transition-all duration-300 ${
+                      isActive
+                        ? 'w-7 sm:w-10 bg-white/30'
+                        : 'w-3.5 sm:w-5 bg-white/25 group-hover:bg-white/60'
+                    }`}
+                  >
+                    {isActive && (
+                      <span
+                        key={`slide-progress-${index}`}
+                        className="absolute inset-0 bg-white rounded-full animate-slide-progress"
+                      />
+                    )}
+                  </span>
+                </button>
+              );
+            })}
           </div>
 
-          {/* Controls: Play/Pause & Chevrons */}
-          <div className="flex items-center gap-1.5">
+          {/* Circular Outline Prev & Next Arrows (44x44px minimum touch targets) */}
+          <div className="flex items-center gap-2">
             <button
-              onClick={() => setIsAutoPlay((prev) => !prev)}
-              className={`p-2 rounded-xl glass-pill transition-all cursor-pointer border ${
-                isAutoPlay
-                  ? 'text-zinc-300 hover:text-white hover:bg-white/15 border-white/10'
-                  : 'text-amber-400 bg-amber-500/10 border-amber-500/30'
-              }`}
-              title={isAutoPlay ? 'Tạm dừng tự động chuyển' : 'Bật tự động chuyển'}
-              aria-label={isAutoPlay ? 'Pause auto-slide' : 'Resume auto-slide'}
+              type="button"
+              onClick={handlePrev}
+              className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-full border border-white/50 hover:border-white text-white flex items-center justify-center transition-all hover:bg-white/10 active:scale-95 cursor-pointer focus-visible:ring-2 focus-visible:ring-amber-400"
+              title="Phim trước"
+              aria-label="Phim trước"
             >
-              {isAutoPlay ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 fill-current" />}
+              <ChevronLeft className="w-5 h-5" />
             </button>
+
             <button
-              onClick={() => setIndex((prev) => (prev - 1 + maxSlides) % maxSlides)}
-              className="p-2 rounded-xl glass-pill hover:bg-white/15 text-zinc-300 hover:text-white transition-all cursor-pointer border border-white/10"
-              aria-label="Previous Slide"
+              type="button"
+              onClick={handleNext}
+              className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-full border border-white/50 hover:border-white text-white flex items-center justify-center transition-all hover:bg-white/10 active:scale-95 cursor-pointer focus-visible:ring-2 focus-visible:ring-amber-400"
+              title="Phim sau"
+              aria-label="Phim sau"
             >
-              <ChevronLeft className="w-4 h-4" />
+              <ChevronRight className="w-5 h-5" />
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Trailer Popup Modal (Plays with full sound, HD quality, and zero clutter on the banner) */}
+      {showTrailerModal && trailerId && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={`${movieTitle} Trailer`}
+          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={() => setShowTrailerModal(false)}
+        >
+          <div
+            className="relative w-full max-w-4xl aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl border border-white/20"
+            onClick={(e) => e.stopPropagation()}
+          >
             <button
-              onClick={() => setIndex((prev) => (prev + 1) % maxSlides)}
-              className="p-2 rounded-xl glass-pill hover:bg-white/15 text-zinc-300 hover:text-white transition-all cursor-pointer border border-white/10"
-              aria-label="Next Slide"
+              type="button"
+              onClick={() => setShowTrailerModal(false)}
+              className="absolute top-3 right-3 z-10 p-2 rounded-full bg-black/70 hover:bg-black text-white hover:text-red-400 transition cursor-pointer"
+              aria-label="Đóng trailer"
             >
-              <ChevronRight className="w-4 h-4" />
+              <X className="w-5 h-5" />
             </button>
+            <iframe
+              src={`https://www.youtube-nocookie.com/embed/${trailerId}?autoplay=1&rel=0`}
+              className="w-full h-full"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              sandbox="allow-scripts allow-same-origin allow-presentation"
+              referrerPolicy="no-referrer"
+              allowFullScreen
+              title={`${movieTitle} Trailer`}
+            />
           </div>
         </div>
       )}

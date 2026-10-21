@@ -38,7 +38,10 @@ export const MovieGrid: React.FC<Props> = ({
   onToggleFav,
 }) => {
   const [jumpPage, setJumpPage] = useState('');
+  const [jumpError, setJumpError] = useState<string | null>(null);
   const [selectedYear, setSelectedYear] = useState<string>('all');
+  const [selectedGenre, setSelectedGenre] = useState<string>('all');
+  const [selectedCountry, setSelectedCountry] = useState<string>('all');
   const [selectedLang, setSelectedLang] = useState<string>('all');
   const [selectedCinema, setSelectedCinema] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'default' | 'rating' | 'year' | 'name'>('default');
@@ -50,8 +53,34 @@ export const MovieGrid: React.FC<Props> = ({
     );
   }, [movies]);
 
+  const availableGenres = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const m of movies) {
+      if (m.category) {
+        for (const c of m.category) {
+          if (c.slug && c.name) map.set(c.slug, c.name);
+        }
+      }
+    }
+    return Array.from(map.entries()).map(([slug, name]) => ({ slug, name }));
+  }, [movies]);
+
+  const availableCountries = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const m of movies) {
+      if (m.country) {
+        for (const c of m.country) {
+          if (c.slug && c.name) map.set(c.slug, c.name);
+        }
+      }
+    }
+    return Array.from(map.entries()).map(([slug, name]) => ({ slug, name }));
+  }, [movies]);
+
   const hasActiveFilters =
     selectedYear !== 'all' ||
+    selectedGenre !== 'all' ||
+    selectedCountry !== 'all' ||
     selectedLang !== 'all' ||
     selectedCinema !== 'all' ||
     sortBy !== 'default' ||
@@ -59,6 +88,8 @@ export const MovieGrid: React.FC<Props> = ({
 
   const resetFilters = () => {
     setSelectedYear('all');
+    setSelectedGenre('all');
+    setSelectedCountry('all');
     setSelectedLang('all');
     setSelectedCinema('all');
     setSortBy('default');
@@ -70,6 +101,30 @@ export const MovieGrid: React.FC<Props> = ({
       .filter((m) => {
         // Filter year
         if (selectedYear !== 'all' && String(m.year) !== selectedYear) return false;
+
+        // Filter genre
+        if (selectedGenre !== 'all') {
+          if (
+            !m.category ||
+            !m.category.some(
+              (c) => c.slug === selectedGenre || c.name.toLowerCase() === selectedGenre.toLowerCase()
+            )
+          ) {
+            return false;
+          }
+        }
+
+        // Filter country
+        if (selectedCountry !== 'all') {
+          if (
+            !m.country ||
+            !m.country.some(
+              (c) => c.slug === selectedCountry || c.name.toLowerCase() === selectedCountry.toLowerCase()
+            )
+          ) {
+            return false;
+          }
+        }
 
         // Filter language
         if (selectedLang !== 'all') {
@@ -102,15 +157,21 @@ export const MovieGrid: React.FC<Props> = ({
         if (sortBy === 'year') return (b.year || 0) - (a.year || 0);
         return 0;
       });
-  }, [movies, selectedYear, selectedLang, selectedCinema, filterSearch, sortBy]);
+  }, [movies, selectedYear, selectedGenre, selectedCountry, selectedLang, selectedCinema, filterSearch, sortBy]);
 
   const handleJump = (e: React.FormEvent) => {
     e.preventDefault();
-    const p = parseInt(jumpPage, 10);
-    if (!isNaN(p) && p >= 1 && p <= totalPages && onPageChange) {
-      onPageChange(p);
-      setJumpPage('');
+    if (!onPageChange) return;
+
+    const p = Number(jumpPage);
+    if (!jumpPage.trim() || !Number.isInteger(p) || p < 1 || p > totalPages) {
+      setJumpError(`Trang phải là số từ 1 đến ${totalPages}.`);
+      return;
     }
+
+    setJumpError(null);
+    onPageChange(p);
+    setJumpPage('');
   };
 
   const getPageNumbers = () => {
@@ -131,7 +192,7 @@ export const MovieGrid: React.FC<Props> = ({
     return pages;
   };
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 w-full">
+    <div className="w-full max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
       {/* Header and Filter Controls */}
       <div className="space-y-4 mb-6 pb-5 border-b border-white/[0.08]">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -141,8 +202,8 @@ export const MovieGrid: React.FC<Props> = ({
                 <span className="w-1.5 h-6 sm:h-7 rounded-full bg-gradient-to-b from-red-500 via-rose-500 to-amber-500 shadow-sm shadow-red-500/50" />
                 {title}
                 {!loading && movies.length > 0 && (
-                  <span className="text-xs font-bold text-zinc-400 bg-white/[0.06] border border-white/[0.08] px-2.5 py-0.5 rounded-full font-sans">
-                    {displayedMovies.length} phim
+                  <span className="text-xs font-bold text-zinc-300 bg-white/[0.08] border border-white/[0.1] px-2.5 py-0.5 rounded-full font-sans">
+                    {hasActiveFilters ? `${displayedMovies.length}/${movies.length} phim (trên trang)` : `${movies.length} phim`}
                   </span>
                 )}
               </h1>
@@ -177,7 +238,7 @@ export const MovieGrid: React.FC<Props> = ({
                 value={filterSearch}
                 onChange={(e) => setFilterSearch(e.target.value)}
                 placeholder="Lọc nhanh tên phim..."
-                className="w-full bg-white/[0.05] hover:bg-white/[0.08] focus:bg-white/[0.09] border border-white/[0.1] focus:border-red-500/50 rounded-xl pl-8 pr-7 py-1.5 text-xs text-white placeholder-zinc-500 focus:outline-none transition-all"
+                className="w-full bg-white/[0.05] hover:bg-white/[0.08] focus:bg-white/[0.09] border border-white/[0.1] focus:border-red-500/50 rounded-xl pl-8 pr-7 py-1.5 text-xs text-white placeholder-zinc-400 focus:outline-none transition-all"
               />
               {filterSearch && (
                 <button
@@ -188,6 +249,44 @@ export const MovieGrid: React.FC<Props> = ({
                 </button>
               )}
             </div>
+
+            {/* Genre filter */}
+            {availableGenres.length > 1 && (
+              <div className="flex items-center gap-1 text-xs text-zinc-300">
+                <select
+                  value={selectedGenre}
+                  onChange={(e) => setSelectedGenre(e.target.value)}
+                  aria-label="Lọc theo thể loại"
+                  className="bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.1] rounded-xl px-2.5 py-1.5 text-white text-xs focus:outline-none focus:border-red-500 cursor-pointer transition-colors"
+                >
+                  <option value="all" className="bg-[#10121a]">Tất cả thể loại</option>
+                  {availableGenres.map((g) => (
+                    <option key={g.slug} value={g.slug} className="bg-[#10121a]">
+                      {g.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Country filter */}
+            {availableCountries.length > 1 && (
+              <div className="flex items-center gap-1 text-xs text-zinc-300">
+                <select
+                  value={selectedCountry}
+                  onChange={(e) => setSelectedCountry(e.target.value)}
+                  aria-label="Lọc theo quốc gia"
+                  className="bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.1] rounded-xl px-2.5 py-1.5 text-white text-xs focus:outline-none focus:border-red-500 cursor-pointer transition-colors"
+                >
+                  <option value="all" className="bg-[#10121a]">Tất cả quốc gia</option>
+                  {availableCountries.map((c) => (
+                    <option key={c.slug} value={c.slug} className="bg-[#10121a]">
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {/* Language filter */}
             <div className="flex items-center gap-1 text-xs text-zinc-300">
@@ -241,7 +340,7 @@ export const MovieGrid: React.FC<Props> = ({
               </span>
               <select
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
+                onChange={(e) => setSortBy(e.target.value as 'default' | 'rating' | 'year' | 'name')}
                 className="bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.1] rounded-xl px-2.5 py-1.5 text-white text-xs focus:outline-none focus:border-red-500 cursor-pointer transition-colors"
               >
                 <option value="default" className="bg-[#10121a]">Mới cập nhật</option>
@@ -256,8 +355,13 @@ export const MovieGrid: React.FC<Props> = ({
 
       {/* Grid Content with Skeleton Loaders */}
       {loading ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3.5 sm:gap-4.5">
-          {Array.from({ length: 12 }).map((_, idx) => (
+        <div
+          role="status"
+          aria-label="Đang tải danh sách phim"
+          aria-busy="true"
+          className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3.5 sm:gap-4.5"
+        >
+          {Array.from({ length: 14 }).map((_, idx) => (
             <div
               key={`skeleton-${idx}`}
               className="rounded-2xl overflow-hidden bg-white/[0.03] border border-white/[0.06] flex flex-col"
@@ -271,7 +375,10 @@ export const MovieGrid: React.FC<Props> = ({
           ))}
         </div>
       ) : displayedMovies.length === 0 ? (
-        <div className="py-20 flex flex-col items-center justify-center text-zinc-400 glass-panel rounded-2xl max-w-md mx-auto text-center p-6 space-y-3">
+        <div
+          role="status"
+          className="py-20 flex flex-col items-center justify-center text-zinc-400 glass-panel rounded-2xl max-w-md mx-auto text-center p-6 space-y-3"
+        >
           <p className="text-base font-bold text-zinc-200">Không tìm thấy phim nào phù hợp</p>
           <span className="text-xs text-zinc-400">
             {hasActiveFilters
@@ -281,7 +388,7 @@ export const MovieGrid: React.FC<Props> = ({
           {hasActiveFilters && (
             <button
               onClick={resetFilters}
-              className="mt-2 flex items-center gap-1.5 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs shadow-md shadow-red-600/30 transition-colors cursor-pointer"
+              className="mt-2 flex items-center gap-1.5 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs shadow-md shadow-red-600/30 transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-white"
             >
               <RotateCcw className="w-3.5 h-3.5" />
               Xóa tất cả bộ lọc
@@ -289,7 +396,7 @@ export const MovieGrid: React.FC<Props> = ({
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3.5 sm:gap-4.5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3.5 sm:gap-4.5">
           {displayedMovies.map((m) => (
             <MovieCard
               key={m.slug}
@@ -304,39 +411,43 @@ export const MovieGrid: React.FC<Props> = ({
 
       {/* Pagination */}
       {totalPages > 1 && onPageChange && !loading && (
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mt-12 pt-6 border-t border-white/[0.08]">
+        <nav aria-label="Phân trang" className="flex flex-col sm:flex-row items-center justify-center gap-4 mt-12 pt-6 border-t border-white/[0.08]">
           <div className="flex items-center gap-1.5 flex-wrap justify-center">
             <button
               onClick={() => onPageChange(1)}
               disabled={page <= 1}
-              className="p-2.5 rounded-xl glass-pill text-zinc-300 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/15 cursor-pointer transition-colors"
+              className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl glass-pill text-zinc-300 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/15 cursor-pointer transition-colors focus-visible:ring-2 focus-visible:ring-red-500"
               title="Trang đầu"
+              aria-label="Trang đầu tiên"
             >
               <ChevronsLeft className="w-4 h-4" />
             </button>
             <button
               onClick={() => onPageChange(Math.max(page - 1, 1))}
               disabled={page <= 1}
-              className="p-2.5 rounded-xl glass-pill text-zinc-300 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/15 cursor-pointer transition-colors"
+              className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl glass-pill text-zinc-300 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/15 cursor-pointer transition-colors focus-visible:ring-2 focus-visible:ring-red-500"
               title="Trang trước"
+              aria-label="Trang trước"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
 
             {getPageNumbers().map((pNum, idx) =>
               pNum === '...' ? (
-                <span key={`dots-${idx}`} className="px-2 text-zinc-500 text-sm select-none">
+                <span key={`dots-${idx}`} className="w-8 h-11 flex items-center justify-center text-zinc-400 text-sm select-none">
                   ...
                 </span>
               ) : (
                 <button
                   key={`p-${pNum}`}
                   onClick={() => onPageChange(pNum as number)}
-                  className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                  className={`w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-red-500 ${
                     page === pNum
                       ? 'bg-gradient-to-r from-red-600 to-rose-600 text-white shadow-lg shadow-red-600/40 glow-red-sm scale-105'
                       : 'glass-pill text-zinc-300 hover:text-white hover:bg-white/15'
                   }`}
+                  aria-label={`Trang ${pNum}`}
+                  aria-current={page === pNum ? 'page' : undefined}
                 >
                   {pNum}
                 </button>
@@ -346,41 +457,59 @@ export const MovieGrid: React.FC<Props> = ({
             <button
               onClick={() => onPageChange(Math.min(page + 1, totalPages))}
               disabled={page >= totalPages}
-              className="p-2.5 rounded-xl glass-pill text-zinc-300 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/15 cursor-pointer transition-colors"
+              className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl glass-pill text-zinc-300 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/15 cursor-pointer transition-colors focus-visible:ring-2 focus-visible:ring-red-500"
               title="Trang sau"
+              aria-label="Trang sau"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
             <button
               onClick={() => onPageChange(totalPages)}
               disabled={page >= totalPages}
-              className="p-2.5 rounded-xl glass-pill text-zinc-300 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/15 cursor-pointer transition-colors"
+              className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl glass-pill text-zinc-300 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-white/15 cursor-pointer transition-colors focus-visible:ring-2 focus-visible:ring-red-500"
               title="Trang cuối"
+              aria-label="Trang cuối cùng"
             >
               <ChevronsRight className="w-4 h-4" />
             </button>
           </div>
 
-          <form onSubmit={handleJump} className="flex items-center gap-2 text-xs text-zinc-400">
-            <span>Đến trang:</span>
-            <input
-              type="number"
-              min={1}
-              max={totalPages}
-              value={jumpPage}
-              onChange={(e) => setJumpPage(e.target.value)}
-              placeholder={String(page)}
-              className="w-14 bg-white/[0.06] border border-white/[0.1] rounded-xl px-2.5 py-1.5 text-center text-white focus:outline-none focus:border-red-500 text-xs font-semibold"
-            />
-            <span className="font-semibold text-zinc-300">/ {totalPages}</span>
-            <button
-              type="submit"
-              className="px-3 py-1.5 rounded-xl bg-white/[0.08] hover:bg-white/20 text-zinc-200 text-xs font-bold cursor-pointer border border-white/[0.1] transition-colors"
-            >
-              Đi
-            </button>
+          <form
+            noValidate
+            onSubmit={handleJump}
+            className="flex flex-col items-center gap-1 text-xs text-zinc-400"
+          >
+            <div className="flex items-center gap-2">
+              <span>Đến trang:</span>
+              <input
+                type="number"
+                min={1}
+                max={totalPages}
+                value={jumpPage}
+                onChange={(e) => {
+                  setJumpPage(e.target.value);
+                  if (jumpError) setJumpError(null);
+                }}
+                placeholder={String(page)}
+                aria-invalid={jumpError ? true : undefined}
+                aria-describedby={jumpError ? 'jump-page-error' : undefined}
+                className="w-14 h-11 min-h-[44px] bg-white/[0.06] border border-white/[0.1] rounded-xl px-2.5 py-1.5 text-center text-white focus:outline-none focus:border-red-500 text-xs font-semibold"
+              />
+              <span className="font-semibold text-zinc-300">/ {totalPages}</span>
+              <button
+                type="submit"
+                className="h-11 min-h-[44px] px-3.5 flex items-center justify-center rounded-xl bg-white/[0.08] hover:bg-white/20 text-zinc-200 text-xs font-bold cursor-pointer border border-white/[0.1] transition-colors"
+              >
+                Đi
+              </button>
+            </div>
+            {jumpError && (
+              <span id="jump-page-error" role="alert" className="text-[11px] font-semibold text-red-400">
+                {jumpError}
+              </span>
+            )}
           </form>
-        </div>
+        </nav>
       )}
     </div>
   );

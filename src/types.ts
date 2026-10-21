@@ -86,3 +86,37 @@ export interface FavoriteItem {
   lang?: string;
   savedAt: number;
 }
+
+interface ApiPagination {
+  totalItems?: number;
+  totalItemsPerPage?: number;
+  currentPage?: number;
+  totalPages?: number;
+}
+
+/** `GET /danh-sach/phim-moi-cap-nhat` */
+export interface NewUpdatedResponse {
+  status?: boolean;
+  msg?: string;
+  items?: MovieItem[];
+  pagination?: ApiPagination;
+}
+
+/** `GET /v1/api/{danh-sach,the-loai,quoc-gia,tim-kiem}` */
+export interface CatalogResponse {
+  status?: boolean;
+  msg?: string;
+  data?: {
+    titlePage?: string;
+    items?: MovieItem[];
+    params?: { pagination?: ApiPagination };
+  };
+}
+
+/** `GET /phim/{slug}` */
+export interface MovieDetailResponse {
+  status?: boolean;
+  msg?: string;
+  movie?: MovieDetail;
+  episodes?: EpisodeServer[];
+}

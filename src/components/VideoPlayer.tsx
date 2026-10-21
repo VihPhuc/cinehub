@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import Hls from 'hls.js';
 import {
   ArrowLeft,
@@ -9,20 +9,28 @@ import {
   RotateCcw,
   Loader2,
   Share2,
-  Moon,
   Timer,
   PictureInPicture2,
   HelpCircle,
   X,
   Check,
+  Sparkles,
+  RectangleHorizontal,
 } from 'lucide-react';
 import type { MovieDetail } from '../types';
 import { saveHistory, getHistory } from '../services/storage';
+import { decideHlsRecovery } from '../lib/hlsRecovery';
+import { formatMovieTitle, getImageUrl } from '../services/api';
+
+// Bounded retry budget for fatal HLS errors (network/media). Prevents an
+// infinite restart loop when the source is permanently unavailable.
+const MAX_NETWORK_RETRIES = 3;
 
 interface Props {
   movie: MovieDetail;
   initialServerIdx?: number;
   initialEpIdx?: number;
+  resumeFromHistory?: boolean;
   onEpChange?: (epIdx: number) => void;
   onBack: () => void;
 }
@@ -31,11 +39,22 @@ export const VideoPlayer: React.FC<Props> = ({
   movie,
   initialServerIdx = 0,
   initialEpIdx = 0,
+  resumeFromHistory = false,
   onEpChange,
   onBack,
 }) => {
   const [serverIdx, setServerIdx] = useState(initialServerIdx);
-  const [epIdx, setEpIdx] = useState(initialEpIdx);
+  const [epIdx, setEpIdx] = useState(() => {
+    if (!resumeFromHistory || initialEpIdx > 0) return initialEpIdx;
+    const history = getHistory();
+    const saved = history.find((h) => h.slug === movie.slug);
+    const activeServer = movie.episodes?.[initialServerIdx] || movie.episodes?.[0];
+    if (saved?.episodeSlug && activeServer) {
+      const idx = activeServer.server_data.findIndex((e) => e.slug === saved.episodeSlug);
+      if (idx >= 0) return idx;
+    }
+    return 0;
+  });
   const [mode, setMode] = useState<'hls' | 'iframe'>('hls');
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -43,20 +62,40 @@ export const VideoPlayer: React.FC<Props> = ({
   const [resumeNotice, setResumeNotice] = useState<string | null>(null);
   const [speed, setSpeed] = useState<number>(1);
   const [epFilter, setEpFilter] = useState<string>('');
-  const [theaterMode, setTheaterMode] = useState<boolean>(false);
+  const [theaterMode, setTheaterMode] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('cinehub_theater_mode') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [ambientGlow, setAmbientGlow] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('cinehub_ambient_glow') !== 'false';
+    } catch {
+      return true;
+    }
+  });
   const [sleepRemaining, setSleepRemaining] = useState<number | null>(null);
   const [showTimerMenu, setShowTimerMenu] = useState<boolean>(false);
   const [showShortcutsModal, setShowShortcutsModal] = useState<boolean>(false);
   const [qualities, setQualities] = useState<{ id: number; height: number; bitrate: number }[]>([]);
   const [currentQuality, setCurrentQuality] = useState<number>(-1);
   const [autoNextCountdown, setAutoNextCountdown] = useState<number | null>(null);
-  const [watchedEpSlugs, setWatchedEpSlugs] = useState<string[]>([]);
+  const [reloadKey, setReloadKey] = useState(0);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsInstanceRef = useRef<Hls | null>(null);
   const toastTimeoutRef = useRef<number | null>(null);
   const speedRef = useRef(speed);
+  const networkRetriesRef = useRef(0);
+  const onEpChangeRef = useRef(onEpChange);
+  useEffect(() => {
+    onEpChangeRef.current = onEpChange;
+  }, [onEpChange]);
+  const lastSyncedEpRef = useRef(initialEpIdx);
+  const pendingEpRef = useRef<number | null>(null);
 
   useEffect(() => {
     speedRef.current = speed;
@@ -65,6 +104,29 @@ export const VideoPlayer: React.FC<Props> = ({
   const server = movie.episodes?.[serverIdx] || movie.episodes?.[0];
   const ep = server?.server_data?.[epIdx] || server?.server_data?.[0];
   const hasNext = Boolean(server?.server_data?.[epIdx + 1]);
+
+  // Keep the player in sync with browser back/forward (App updates initialEpIdx
+  // from the URL) without remounting or interrupting the current stream.
+  useEffect(() => {
+    if (lastSyncedEpRef.current === initialEpIdx && pendingEpRef.current === null) return;
+
+    pendingEpRef.current = initialEpIdx;
+    const length = server?.server_data.length ?? 0;
+    const next = length > 0 ? Math.max(0, Math.min(initialEpIdx, length - 1)) : 0;
+    Promise.resolve().then(() => {
+      if (pendingEpRef.current !== initialEpIdx) return;
+      pendingEpRef.current = null;
+      lastSyncedEpRef.current = initialEpIdx;
+      setEpIdx(next);
+    });
+  }, [initialEpIdx, server]);
+
+  // Only user/auto-next actions notify App. Prop-driven sync above must not
+  // echo back, otherwise popstate and onEpChange can fight in a render loop.
+  const selectEpisode = (index: number) => {
+    setEpIdx(index);
+    onEpChange?.(index);
+  };
 
   const changeSpeed = (s: number) => {
     setSpeed(s);
@@ -90,51 +152,78 @@ export const VideoPlayer: React.FC<Props> = ({
     toastTimeoutRef.current = window.setTimeout(() => setToastMsg(null), 1500);
   }, []);
 
-  useEffect(() => {
+  const toggleTheaterMode = () => {
+    setTheaterMode((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('cinehub_theater_mode', String(next));
+      } catch {
+        // ignore
+      }
+      showToast(next ? 'Chế độ rạp phim: Bật' : 'Chế độ rạp phim: Tắt');
+      return next;
+    });
+  };
+
+  const toggleAmbientGlow = () => {
+    setAmbientGlow((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('cinehub_ambient_glow', String(next));
+      } catch {
+        // ignore
+      }
+      showToast(next ? 'Đèn rạp (Ambient Glow): Bật' : 'Đèn rạp (Ambient Glow): Tắt');
+      return next;
+    });
+  };
+
+
+
+  const episodeProgressMap = useMemo(() => {
     const list = getHistory();
-    const slugs = list.filter((h) => h.slug === movie.slug).map((h) => h.episodeSlug);
-    setWatchedEpSlugs(slugs);
-    setAutoNextCountdown(null);
-  }, [movie.slug, epIdx]);
+    const map = new Map<string, number>();
+    for (const h of list) {
+      if (h.slug === movie.slug && h.episodeSlug) {
+        const pct = h.duration > 0 ? Math.min(100, Math.round((h.currentTime / h.duration) * 100)) : 0;
+        map.set(h.episodeSlug, pct);
+      }
+    }
+    return map;
+  }, [movie.slug]);
 
   useEffect(() => {
     if (autoNextCountdown === null) return;
-    if (autoNextCountdown <= 0) {
-      setAutoNextCountdown(null);
-      if (hasNext) {
-        setEpIdx((prev) => prev + 1);
-      }
-      return;
-    }
     const timer = window.setTimeout(() => {
-      setAutoNextCountdown((prev) => (prev !== null ? prev - 1 : null));
+      setAutoNextCountdown((prev) => {
+        if (prev === null) return null;
+        if (prev <= 1) {
+          setEpIdx((current) => {
+            const next = current + 1;
+            const exists = Boolean(server?.server_data?.[next]);
+            if (exists) onEpChangeRef.current?.(next);
+            return exists ? next : current;
+          });
+          return null;
+        }
+        return prev - 1;
+      });
     }, 1000);
     return () => window.clearTimeout(timer);
-  }, [autoNextCountdown, hasNext]);
-
-  useEffect(() => {
-    const history = getHistory();
-    const saved = history.find((h) => h.slug === movie.slug);
-    if (saved?.episodeSlug && server) {
-      const idx = server.server_data.findIndex((e) => e.slug === saved.episodeSlug);
-      if (idx >= 0) setEpIdx(idx);
-    }
-  }, [movie.slug, server]);
-
-  useEffect(() => {
-    onEpChange?.(epIdx);
-  }, [epIdx, onEpChange]);
+  }, [autoNextCountdown, server]);
 
   useEffect(() => {
     if (sleepRemaining === null) return;
-    if (sleepRemaining <= 0) {
-      if (videoRef.current) videoRef.current.pause();
-      showToast('Đã dừng phát theo hẹn giờ');
-      setSleepRemaining(null);
-      return;
-    }
     const interval = setInterval(() => {
-      setSleepRemaining((prev) => (prev !== null && prev > 1 ? prev - 1 : 0));
+      setSleepRemaining((prev) => {
+        if (prev === null) return null;
+        if (prev <= 1) {
+          if (videoRef.current) videoRef.current.pause();
+          showToast('Đã dừng phát theo hẹn giờ');
+          return null;
+        }
+        return prev - 1;
+      });
     }, 1000);
     return () => clearInterval(interval);
   }, [sleepRemaining, showToast]);
@@ -177,6 +266,12 @@ export const VideoPlayer: React.FC<Props> = ({
     setErrorMsg(null);
     setLoading(true);
 
+    // Always tear down the previous instance before creating a new one.
+    if (hlsInstanceRef.current) {
+      hlsInstanceRef.current.destroy();
+      hlsInstanceRef.current = null;
+    }
+
     if (!ep.link_m3u8) {
       setMode('iframe');
       setLoading(false);
@@ -184,13 +279,36 @@ export const VideoPlayer: React.FC<Props> = ({
     }
 
     const video = videoRef.current;
-    if (!video) return;
+    if (!video) {
+      setLoading(false);
+      return;
+    }
 
     setQualities([]);
     setCurrentQuality(-1);
 
     let hls: Hls | null = null;
-    setMode('hls');
+    let nativeCleanup: (() => void) | null = null;
+
+    const applyResumePosition = (video: HTMLVideoElement) => {
+      const history = getHistory();
+      const saved = history.find((h) => h.slug === movie.slug && h.episodeSlug === ep.slug);
+      if (!saved || saved.currentTime <= 5 || saved.currentTime >= saved.duration - 15) return;
+      // Duration may not be known yet (native HLS); seek after metadata arrives.
+      if (video.readyState < 1) {
+        video.addEventListener(
+          'loadedmetadata',
+          () => {
+            video.currentTime = saved.currentTime;
+          },
+          { once: true }
+        );
+      } else {
+        video.currentTime = saved.currentTime;
+      }
+      setResumeNotice(`Tiếp tục phát từ ${formatTime(saved.currentTime)}`);
+      setTimeout(() => setResumeNotice(null), 3500);
+    };
 
     if (Hls.isSupported()) {
       hls = new Hls({
@@ -199,6 +317,7 @@ export const VideoPlayer: React.FC<Props> = ({
         backBufferLength: 90,
       });
       hlsInstanceRef.current = hls;
+      networkRetriesRef.current = 0;
 
       hls.loadSource(ep.link_m3u8);
       hls.attachMedia(video);
@@ -217,73 +336,120 @@ export const VideoPlayer: React.FC<Props> = ({
         if (videoRef.current) {
           videoRef.current.playbackRate = speedRef.current;
         }
-        const history = getHistory();
-        const saved = history.find((h) => h.slug === movie.slug && h.episodeSlug === ep.slug);
-        if (saved && saved.currentTime > 5 && saved.currentTime < (saved.duration - 15)) {
-          video.currentTime = saved.currentTime;
-          setResumeNotice(`Tiếp tục phát từ ${formatTime(saved.currentTime)}`);
-          setTimeout(() => setResumeNotice(null), 3500);
-        }
+        applyResumePosition(video);
         video.play().catch(() => {});
       });
 
       hls.on(Hls.Events.ERROR, (_, data) => {
-        if (data.fatal) {
-          switch (data.type) {
-            case Hls.ErrorTypes.NETWORK_ERROR:
-              hls?.startLoad();
-              break;
-            case Hls.ErrorTypes.MEDIA_ERROR:
-              hls?.recoverMediaError();
-              break;
-            default:
-              hls?.destroy();
-              hlsInstanceRef.current = null;
-              setErrorMsg('Không thể giải mã luồng HLS. Bạn có thể thử lại hoặc đổi sang iframe embed.');
-              setLoading(false);
-              break;
-          }
+        if (!data.fatal) return;
+        const action = decideHlsRecovery(
+          data.type,
+          networkRetriesRef.current,
+          MAX_NETWORK_RETRIES
+        );
+        if (action === 'retry-network') {
+          networkRetriesRef.current += 1;
+          hls?.startLoad();
+          return;
         }
+        if (action === 'recover-media') {
+          networkRetriesRef.current += 1;
+          hls?.recoverMediaError();
+          return;
+        }
+        hls?.destroy();
+        hlsInstanceRef.current = null;
+        setErrorMsg('Không thể tải luồng video. Bạn có thể thử lại hoặc đổi sang iframe embed.');
+        setLoading(false);
       });
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      // Safari/iOS play HLS natively. Wait for metadata before seeking, and
+      // surface decode/network failures instead of showing a black frame.
+      const onNativeReady = () => {
+        setLoading(false);
+        applyResumePosition(video);
+        video.play().catch(() => {});
+      };
+      const onNativeError = () => {
+        setLoading(false);
+        setErrorMsg('Không thể phát luồng HLS trên trình duyệt này. Bạn có thể đổi sang iframe embed.');
+      };
+      const onNativeStalled = () => {
+        if (video.readyState < 3) setLoading(true);
+      };
+
+      video.addEventListener('loadedmetadata', onNativeReady, { once: true });
+      video.addEventListener('error', onNativeError);
+      video.addEventListener('stalled', onNativeStalled);
       video.src = ep.link_m3u8;
-      video.play().catch(() => {});
-      setLoading(false);
+      video.load();
+
+      nativeCleanup = () => {
+        video.removeEventListener('loadedmetadata', onNativeReady);
+        video.removeEventListener('error', onNativeError);
+        video.removeEventListener('stalled', onNativeStalled);
+      };
     } else {
       setMode('iframe');
       setLoading(false);
     }
 
     return () => {
+      nativeCleanup?.();
       if (hls) {
         hls.destroy();
-        hlsInstanceRef.current = null;
+        if (hlsInstanceRef.current === hls) hlsInstanceRef.current = null;
       }
     };
   }, [ep, movie.slug]);
 
+  // Reload the stream when the episode changes, when the playback mode flips back
+  // to HLS, or when the user asks for a retry. `mode` must be a dependency or the
+  // <video> element remounts without a source and the player stays black.
   useEffect(() => {
-    const cleanup = loadHlsStream();
+    if (mode !== 'hls') {
+      if (hlsInstanceRef.current) {
+        hlsInstanceRef.current.destroy();
+        hlsInstanceRef.current = null;
+      }
+      return;
+    }
+    let cleanup: (() => void) | undefined;
+    const timer = setTimeout(() => {
+      cleanup = loadHlsStream();
+    }, 0);
     return () => {
+      clearTimeout(timer);
       if (cleanup) cleanup();
     };
-  }, [loadHlsStream]);
+  }, [loadHlsStream, mode, reloadKey]);
+
+  const retryStream = useCallback(() => {
+    networkRetriesRef.current = 0;
+    setErrorMsg(null);
+    setReloadKey((k) => k + 1);
+  }, []);
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !server || !ep) return;
 
+    // Throttle history writes: `timeupdate` fires ~4x/sec and every write hits
+    // localStorage + a storage event. Persist at most every 5 seconds.
+    let lastSavedAt = 0;
     const onUpdate = () => {
-      if (video.currentTime > 3) {
-        saveHistory({
-          movie,
-          serverName: server.server_name,
-          episodeSlug: ep.slug,
-          episodeName: ep.name,
-          currentTime: Math.floor(video.currentTime),
-          duration: Math.floor(video.duration || 0),
-        });
-      }
+      if (video.currentTime <= 3) return;
+      const now = Date.now();
+      if (now - lastSavedAt < 5000) return;
+      lastSavedAt = now;
+      saveHistory({
+        movie,
+        serverName: server.server_name,
+        episodeSlug: ep.slug,
+        episodeName: ep.name,
+        currentTime: Math.floor(video.currentTime),
+        duration: Math.floor(video.duration || 0),
+      });
     };
 
     const onEnded = () => {
@@ -294,17 +460,23 @@ export const VideoPlayer: React.FC<Props> = ({
 
     const onWaiting = () => setLoading(true);
     const onPlaying = () => setLoading(false);
+    const onError = () => {
+      setLoading(false);
+      setErrorMsg('Không thể tải luồng video bằng trình phát gốc. Bạn có thể thử lại hoặc đổi sang chế độ nhúng (Embed).');
+    };
 
     video.addEventListener('timeupdate', onUpdate);
     video.addEventListener('ended', onEnded);
     video.addEventListener('waiting', onWaiting);
     video.addEventListener('playing', onPlaying);
+    video.addEventListener('error', onError);
 
     return () => {
       video.removeEventListener('timeupdate', onUpdate);
       video.removeEventListener('ended', onEnded);
       video.removeEventListener('waiting', onWaiting);
       video.removeEventListener('playing', onPlaying);
+      video.removeEventListener('error', onError);
     };
   }, [movie, server, ep, hasNext, showToast]);
 
@@ -319,9 +491,35 @@ export const VideoPlayer: React.FC<Props> = ({
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const activeEl = document.activeElement;
-      const isInput = activeEl?.tagName === 'INPUT' || activeEl?.tagName === 'TEXTAREA';
-      if (isInput) return;
+      // If shortcuts modal is open, let Escape dismiss it and don't manipulate video behind modal
+      if (showShortcutsModal) {
+        if (e.code === 'Escape') {
+          e.preventDefault();
+          setShowShortcutsModal(false);
+        }
+        return;
+      }
+
+      const activeEl = document.activeElement as HTMLElement | null;
+      const tag = activeEl?.tagName;
+      // Never hijack typing in text fields.
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || activeEl?.isContentEditable) return;
+      // Space/arrows belong to a focused control (button, select, link, or elements with role=button) — the
+      // browser handles those natively, so don't preventDefault or double-fire.
+      const isInteractive =
+        tag === 'BUTTON' ||
+        tag === 'SELECT' ||
+        tag === 'A' ||
+        tag === 'OPTION' ||
+        activeEl?.getAttribute('role') === 'button' ||
+        Boolean(activeEl?.closest('button, select, a, [role="button"]'));
+      const isSpaceOrArrow =
+        e.code === 'Space' ||
+        e.code === 'ArrowLeft' ||
+        e.code === 'ArrowRight' ||
+        e.code === 'ArrowUp' ||
+        e.code === 'ArrowDown';
+      if (isInteractive && isSpaceOrArrow) return;
 
       const video = videoRef.current;
       if (!video) return;
@@ -367,6 +565,32 @@ export const VideoPlayer: React.FC<Props> = ({
           video.muted = !video.muted;
           showToast(video.muted ? 'Đã tắt tiếng' : 'Đã bật tiếng');
           break;
+        case 'KeyT':
+          e.preventDefault();
+          setTheaterMode((prev) => {
+            const next = !prev;
+            try {
+              localStorage.setItem('cinehub_theater_mode', String(next));
+            } catch {
+              // ignore
+            }
+            showToast(next ? 'Chế độ rạp phim: Bật' : 'Chế độ rạp phim: Tắt');
+            return next;
+          });
+          break;
+        case 'KeyG':
+          e.preventDefault();
+          setAmbientGlow((prev) => {
+            const next = !prev;
+            try {
+              localStorage.setItem('cinehub_ambient_glow', String(next));
+            } catch {
+              // ignore
+            }
+            showToast(next ? 'Đèn rạp (Ambient Glow): Bật' : 'Đèn rạp (Ambient Glow): Tắt');
+            return next;
+          });
+          break;
         case 'Slash':
           if (e.shiftKey) {
             e.preventDefault();
@@ -378,7 +602,7 @@ export const VideoPlayer: React.FC<Props> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [toggleFullscreen, showToast]);
+  }, [toggleFullscreen, showToast, showShortcutsModal]);
 
   return (
     <div className="min-h-screen bg-[#07080c] text-white flex flex-col font-sans relative">
@@ -386,7 +610,7 @@ export const VideoPlayer: React.FC<Props> = ({
       <div className="sticky top-0 z-40 h-16 px-4 sm:px-6 bg-[#090a0f]/90 backdrop-blur-xl border-b border-white/[0.08] flex items-center justify-between gap-3">
         <button
           onClick={onBack}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-xl glass-pill hover:bg-white/15 text-xs sm:text-sm font-bold text-zinc-300 hover:text-white transition-all cursor-pointer border border-white/10 shrink-0"
+          className="flex items-center gap-2 h-11 min-h-[44px] px-3.5 rounded-xl glass-pill hover:bg-white/15 text-xs sm:text-sm font-bold text-zinc-300 hover:text-white transition-all cursor-pointer border border-white/10 shrink-0 focus-visible:ring-2 focus-visible:ring-red-500"
         >
           <ArrowLeft className="w-4 h-4 text-zinc-400" />
           <span>Quay lại</span>
@@ -394,7 +618,7 @@ export const VideoPlayer: React.FC<Props> = ({
 
         <div className="truncate px-2 sm:px-4 text-center max-w-md">
           <span className="font-extrabold text-sm sm:text-base text-zinc-100 font-heading">
-            {movie.name}
+            {formatMovieTitle(movie.name)}
           </span>
           {ep && (
             <span className="px-2 py-0.5 ml-2 rounded-md bg-red-600/20 text-red-400 font-bold text-xs border border-red-500/30">
@@ -408,7 +632,7 @@ export const VideoPlayer: React.FC<Props> = ({
           <div className="relative">
             <button
               onClick={() => setShowTimerMenu(!showTimerMenu)}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all border ${
+              className={`flex items-center gap-1.5 h-11 min-h-[44px] px-3 rounded-xl text-xs font-bold cursor-pointer transition-all border ${
                 sleepRemaining !== null
                   ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-sm shadow-amber-500/20'
                   : 'glass-pill text-zinc-300 hover:text-white hover:bg-white/15 border-white/10'
@@ -422,14 +646,14 @@ export const VideoPlayer: React.FC<Props> = ({
             </button>
             {showTimerMenu && (
               <div className="absolute right-0 top-full mt-2 w-44 glass-dropdown rounded-2xl p-1.5 z-50 text-xs shadow-2xl animate-in fade-in slide-in-from-top-2">
-                <div className="px-2 py-1 text-[10px] font-bold text-zinc-400 uppercase tracking-wider border-b border-white/[0.08] mb-1">
+                <div className="px-2 py-1 text-[11px] font-bold text-zinc-400 uppercase tracking-wider border-b border-white/[0.08] mb-1">
                   Hẹn giờ tắt video
                 </div>
                 {[15, 30, 45, 60].map((mins) => (
                   <button
                     key={mins}
                     onClick={() => setTimer(mins)}
-                    className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-white/10 text-zinc-200 cursor-pointer font-medium transition-colors"
+                    className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-white/10 text-zinc-200 cursor-pointer font-medium transition-colors"
                   >
                     Sau {mins} phút
                   </button>
@@ -437,7 +661,7 @@ export const VideoPlayer: React.FC<Props> = ({
                 {sleepRemaining !== null && (
                   <button
                     onClick={() => setTimer(null)}
-                    className="w-full text-left px-2.5 py-1.5 rounded-lg text-red-400 hover:bg-red-600/20 cursor-pointer font-bold transition-colors mt-1 border-t border-white/[0.08]"
+                    className="w-full text-left px-2.5 py-2 rounded-lg text-red-400 hover:bg-red-600/20 cursor-pointer font-bold transition-colors mt-1 border-t border-white/[0.08]"
                   >
                     Hủy hẹn giờ
                   </button>
@@ -446,55 +670,76 @@ export const VideoPlayer: React.FC<Props> = ({
             )}
           </div>
 
+          {/* Ambient Glow Toggle */}
+          <button
+            onClick={toggleAmbientGlow}
+            aria-pressed={ambientGlow}
+            className={`flex items-center gap-1.5 h-11 min-h-[44px] px-3 rounded-xl text-xs font-bold cursor-pointer transition-all border ${
+              ambientGlow
+                ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-sm shadow-amber-500/20'
+                : 'glass-pill text-zinc-400 hover:text-zinc-200 border-white/10'
+            }`}
+            title="Bật/Tắt ánh sáng hắt rạp phim (Phím G)"
+            aria-label="Hiệu ứng ánh sáng rạp phim Ambient Glow"
+          >
+            <Sparkles className={`w-3.5 h-3.5 ${ambientGlow ? 'text-amber-400 fill-amber-400/30' : 'text-zinc-400'}`} />
+            <span className="hidden xl:inline">{ambientGlow ? 'Đèn Rạp' : 'Tắt Đèn'}</span>
+          </button>
+
           {/* Theater Mode */}
           <button
-            onClick={() => setTheaterMode(!theaterMode)}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all border ${
+            onClick={toggleTheaterMode}
+            aria-pressed={theaterMode}
+            className={`flex items-center gap-1.5 h-11 min-h-[44px] px-3 rounded-xl text-xs font-bold cursor-pointer transition-all border ${
               theaterMode
-                ? 'bg-gradient-to-r from-red-600 to-rose-600 text-white border-red-500 shadow-md shadow-red-600/30'
+                ? 'bg-gradient-to-r from-red-600 to-rose-600 text-white border-red-500 shadow-md shadow-red-600/30 glow-red-sm'
                 : 'glass-pill text-zinc-300 hover:text-white hover:bg-white/15 border-white/10'
             }`}
-            title="Chế độ rạp phim"
+            title="Chế độ rạp phim (Phím T)"
+            aria-label="Chế độ rạp phim Theater Mode"
           >
-            <Moon className="w-3.5 h-3.5" />
-            <span className="hidden md:inline">{theaterMode ? 'Tắt Rạp' : 'Rạp Phim'}</span>
+            <RectangleHorizontal className="w-4 h-4" />
+            <span className="hidden md:inline">{theaterMode ? 'Thu nhỏ' : 'Rạp Phim'}</span>
           </button>
 
           {/* Picture in Picture */}
           {mode === 'hls' && (
             <button
               onClick={togglePip}
-              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 glass-pill hover:bg-white/15 text-zinc-300 hover:text-white rounded-xl text-xs font-bold cursor-pointer border border-white/10 transition-all"
+              className="hidden sm:flex items-center justify-center w-11 h-11 min-w-[44px] min-h-[44px] glass-pill hover:bg-white/15 text-zinc-300 hover:text-white rounded-xl text-xs font-bold cursor-pointer border border-white/10 transition-all"
               title="Cửa sổ nổi (Picture-in-Picture)"
+              aria-label="Cửa sổ nổi Picture-in-Picture"
             >
-              <PictureInPicture2 className="w-3.5 h-3.5" />
+              <PictureInPicture2 className="w-4 h-4" />
             </button>
           )}
 
           {/* Keyboard shortcuts */}
           <button
             onClick={() => setShowShortcutsModal(true)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 glass-pill hover:bg-white/15 text-zinc-300 hover:text-white rounded-xl text-xs font-bold cursor-pointer border border-white/10 transition-all"
+            className="flex items-center justify-center w-11 h-11 min-w-[44px] min-h-[44px] glass-pill hover:bg-white/15 text-zinc-300 hover:text-white rounded-xl text-xs font-bold cursor-pointer border border-white/10 transition-all"
             title="Bảng phím tắt (?)"
+            aria-label="Bảng phím tắt trợ năng"
           >
-            <HelpCircle className="w-3.5 h-3.5 text-zinc-400" />
+            <HelpCircle className="w-4 h-4 text-zinc-400" />
           </button>
 
           {/* Share */}
           <button
             onClick={handleShare}
-            className="flex items-center gap-1.5 px-3 py-1.5 glass-pill hover:bg-white/15 text-zinc-300 hover:text-white rounded-xl text-xs font-bold cursor-pointer border border-white/10 transition-all"
+            className="flex items-center gap-1.5 h-11 min-h-[44px] px-3 glass-pill hover:bg-white/15 text-zinc-300 hover:text-white rounded-xl text-xs font-bold cursor-pointer border border-white/10 transition-all"
             title="Sao chép liên kết tập phim"
+            aria-label="Chia sẻ liên kết tập phim"
           >
-            <Share2 className="w-3.5 h-3.5 text-zinc-400" />
+            <Share2 className="w-4 h-4 text-zinc-400" />
             <span className="hidden sm:inline">Chia sẻ</span>
           </button>
 
           {/* Next Episode Button */}
           {hasNext && (
             <button
-              onClick={() => setEpIdx(epIdx + 1)}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 rounded-xl text-xs font-black cursor-pointer shadow-md shadow-red-600/30 transition-all hover:scale-105"
+              onClick={() => selectEpisode(epIdx + 1)}
+              className="flex items-center gap-1.5 h-11 min-h-[44px] px-3.5 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 rounded-xl text-xs font-black cursor-pointer shadow-md shadow-red-600/30 transition-all hover:scale-105"
             >
               <span>Tập tiếp</span>
               <SkipForward className="w-3.5 h-3.5" />
@@ -503,26 +748,50 @@ export const VideoPlayer: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* Main Video Viewport */}
+      {/* Main Video Viewport & Cinema Stage */}
       <div
-        className={`mx-auto w-full transition-all duration-300 flex-1 flex flex-col gap-4 ${
-          theaterMode ? 'max-w-none px-0 py-0 bg-black' : 'max-w-7xl px-3 sm:px-6 py-6'
+        className={`mx-auto w-full transition-all duration-300 flex-1 flex flex-col items-center ${
+          theaterMode ? 'max-w-none px-0 py-0 bg-[#050608]' : 'max-w-[1720px] px-3 sm:px-6 lg:px-8 py-6'
         }`}
       >
-        {/* Cinema Ambilight Wrapper */}
-        <div className="relative w-full">
-          {!theaterMode && (
-            <div className="absolute -inset-2 sm:-inset-4 bg-gradient-to-r from-red-600/20 via-rose-600/15 to-amber-500/20 blur-3xl opacity-70 pointer-events-none rounded-3xl" />
+        {/* Cinema Ambilight Ambient Glow Wrapper */}
+        <div className={`relative w-full transition-all duration-300 ${theaterMode ? 'bg-[#040508]' : ''}`}>
+          {/* Layer 1: Atmospheric dynamic glow */}
+          {ambientGlow && (
+            <div
+              className={`absolute transition-all duration-700 pointer-events-none rounded-3xl blur-3xl ${
+                theaterMode
+                  ? '-inset-6 sm:-inset-10 opacity-75'
+                  : '-inset-3 sm:-inset-6 opacity-65'
+              }`}
+              style={{
+                background:
+                  'radial-gradient(ellipse 90% 65% at 50% 50%, var(--theme-accent-glow) 0%, rgba(225, 29, 72, 0.16) 40%, rgba(245, 158, 11, 0.08) 70%, transparent 100%)',
+              }}
+            />
+          )}
+
+          {/* Layer 2: Movie backdrop reflection glow */}
+          {ambientGlow && movie.poster_url && (
+            <div
+              className={`absolute pointer-events-none opacity-20 blur-3xl bg-cover bg-center transition-all duration-700 -z-10 ${
+                theaterMode ? '-inset-8 sm:-inset-16' : '-inset-4 sm:-inset-8 rounded-3xl'
+              }`}
+              style={{
+                backgroundImage: `url(${getImageUrl(movie.poster_url)})`,
+                filter: 'blur(60px) saturate(200%)',
+              }}
+            />
           )}
 
           <div
             ref={containerRef}
-            className={`relative aspect-video w-full bg-black overflow-hidden shadow-2xl group ${
-            theaterMode
-              ? 'rounded-none max-h-[85vh]'
-              : 'rounded-2xl border border-white/[0.1] shadow-2xl shadow-black/80'
-          }`}
-        >
+            className={`relative aspect-video w-full bg-black overflow-hidden shadow-2xl group transition-all duration-300 ${
+              theaterMode
+                ? 'rounded-none max-h-[85vh] h-[54vw] min-h-[380px] border-b border-white/[0.08]'
+                : 'rounded-2xl border border-white/[0.1] shadow-2xl shadow-black/80'
+            }`}
+          >
           {mode === 'hls' ? (
             <video
               ref={videoRef}
@@ -535,6 +804,10 @@ export const VideoPlayer: React.FC<Props> = ({
               src={ep.link_embed}
               title={movie.name}
               allowFullScreen
+              loading="lazy"
+              referrerPolicy="no-referrer"
+              sandbox="allow-scripts allow-same-origin allow-presentation allow-forms"
+              onLoad={() => setLoading(false)}
               className="w-full h-full border-0"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             />
@@ -577,7 +850,7 @@ export const VideoPlayer: React.FC<Props> = ({
               <p className="text-xs text-zinc-400 max-w-md mb-5 leading-relaxed">{errorMsg}</p>
               <div className="flex flex-wrap items-center justify-center gap-3">
                 <button
-                  onClick={loadHlsStream}
+                  onClick={retryStream}
                   className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white text-xs font-bold rounded-xl cursor-pointer shadow-lg shadow-red-600/30 transition-all hover:scale-105"
                 >
                   <RotateCcw className="w-4 h-4" /> Thử lại
@@ -619,7 +892,7 @@ export const VideoPlayer: React.FC<Props> = ({
                 <button
                   onClick={() => {
                     setAutoNextCountdown(null);
-                    setEpIdx((prev) => prev + 1);
+                    selectEpisode(epIdx + 1);
                   }}
                   className="px-5 py-2 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white text-xs font-black cursor-pointer transition-all shadow-lg shadow-red-600/40 flex items-center gap-2 hover:scale-105"
                 >
@@ -632,56 +905,67 @@ export const VideoPlayer: React.FC<Props> = ({
         </div>
       </div>
 
-        {/* Controls, Servers & Episodes Section */}
-        <div
-          className={`flex flex-col gap-4 transition-opacity ${
-            theaterMode ? 'max-w-7xl mx-auto w-full px-4 pb-8 opacity-80 hover:opacity-100' : ''
-          }`}
-        >
-          {/* Quick shortcuts info bar */}
-          <div className="flex flex-wrap items-center justify-between text-[11px] text-zinc-400 px-2 py-1">
-            <div className="flex flex-wrap items-center gap-3 font-medium">
-              <span>
-                <strong className="text-zinc-200">Phím tắt:</strong> [Space/K] Tạm dừng
-              </span>
-              <span>[← / →] Tua 10s</span>
-              <span>[↑ / ↓] Âm lượng</span>
-              <span>[M] Tắt tiếng</span>
-              <span>[F] Toàn màn hình</span>
-            </div>
-            <div>
-              Nguồn phát:{' '}
-              <span className="text-red-400 font-bold">{server?.server_name || 'Mặc định'}</span>
-            </div>
+      {/* Controls, Servers & Episodes Section */}
+      <div
+        className={`flex flex-col gap-4 transition-opacity ${
+          theaterMode ? 'max-w-[1720px] mx-auto w-full px-4 sm:px-6 lg:px-8 pb-8 opacity-80 hover:opacity-100' : ''
+        }`}
+      >
+        {/* Quick shortcuts info bar */}
+        <div className="flex flex-wrap items-center justify-between text-[11px] text-zinc-400 px-2 py-1">
+          <div className="flex flex-wrap items-center gap-3 font-medium">
+            <span>
+              <strong className="text-zinc-200">Phím tắt:</strong> [Space/K] Tạm dừng
+            </span>
+            <span>[← / →] Tua 10s</span>
+            <span>[↑ / ↓] Âm lượng</span>
+            <span>[M] Tắt tiếng</span>
+            <span>[T] Rạp phim</span>
+            <span>[G] Đèn rạp</span>
+            <span>[F] Toàn màn hình</span>
           </div>
+          <div>
+            Nguồn phát:{' '}
+            <span className="text-red-400 font-bold">{server?.server_name || 'Mặc định'}</span>
+          </div>
+        </div>
 
-          <div className="glass-panel rounded-2xl p-4 sm:p-5 space-y-4">
-            {/* Server & Quality Selection Bar */}
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.08] pb-4">
-              <div className="flex items-center gap-2.5 flex-wrap">
-                <div className="flex items-center gap-1.5 text-zinc-400">
-                  <Server className="w-4 h-4 text-red-500" />
-                  <span className="text-xs font-bold text-zinc-300">Máy Chủ:</span>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {movie.episodes?.map((s, idx) => (
-                    <button
-                      key={s.server_name}
-                      onClick={() => {
-                        setServerIdx(idx);
-                        setEpIdx(0);
-                      }}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all ${
-                        serverIdx === idx
-                          ? 'bg-gradient-to-r from-red-600 to-rose-600 text-white shadow-md shadow-red-600/30 glow-red-sm scale-105'
-                          : 'glass-pill text-zinc-300 hover:text-white hover:bg-white/10'
-                      }`}
-                    >
-                      {s.server_name}
-                    </button>
-                  ))}
-                </div>
+        <div className="glass-panel rounded-2xl p-4 sm:p-5 space-y-4">
+          {/* Server & Quality Selection Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.08] pb-4">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <div className="flex items-center gap-1.5 text-zinc-400">
+                <Server className="w-4 h-4 text-red-500" />
+                <span className="text-xs font-bold text-zinc-300">Máy Chủ:</span>
               </div>
+              <div className="flex flex-wrap gap-2">
+                {movie.episodes?.map((s, idx) => (
+                  <button
+                    key={s.server_name}
+                    onClick={() => {
+                      setServerIdx(idx);
+                      const targetServer = movie.episodes?.[idx];
+                      if (targetServer?.server_data) {
+                        const curSlug = ep?.slug;
+                        const sameSlugIdx = targetServer.server_data.findIndex((e) => e.slug === curSlug);
+                        if (sameSlugIdx >= 0) {
+                          selectEpisode(sameSlugIdx);
+                        } else if (!targetServer.server_data[epIdx]) {
+                          selectEpisode(0);
+                        }
+                      }
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all ${
+                      serverIdx === idx
+                        ? 'bg-gradient-to-r from-red-600 to-rose-600 text-white shadow-md shadow-red-600/30 glow-red-sm scale-105'
+                        : 'glass-pill text-zinc-300 hover:text-white hover:bg-white/10'
+                    }`}
+                  >
+                    {s.server_name}
+                  </button>
+                ))}
+              </div>
+            </div>
 
               <div className="flex items-center gap-2.5 flex-wrap">
                 {/* HLS Resolution / Quality Selector */}
@@ -711,7 +995,8 @@ export const VideoPlayer: React.FC<Props> = ({
                       <button
                         key={s}
                         onClick={() => changeSpeed(s)}
-                        className={`px-2 py-0.5 rounded-lg text-[11px] font-bold cursor-pointer transition-colors ${
+                        aria-pressed={speed === s}
+                        className={`min-h-[36px] min-w-[36px] px-2 py-1 flex items-center justify-center rounded-lg text-xs font-bold cursor-pointer transition-colors ${
                           speed === s
                             ? 'bg-gradient-to-r from-red-600 to-rose-600 text-white'
                             : 'text-zinc-400 hover:text-white'
@@ -767,20 +1052,34 @@ export const VideoPlayer: React.FC<Props> = ({
                     )
                     .map(({ e, idx }) => {
                       const isCurrent = epIdx === idx;
-                      const isWatched = watchedEpSlugs.includes(e.slug);
+                      const pct = episodeProgressMap.get(e.slug) ?? 0;
+                      const isCompleted = pct >= 90;
                       return (
                         <button
                           key={e.slug}
-                          onClick={() => setEpIdx(idx)}
-                          className={`relative py-2 px-2 rounded-xl text-xs font-bold border truncate cursor-pointer transition-all flex items-center justify-center gap-1.5 ${
+                          onClick={() => selectEpisode(idx)}
+                          aria-label={`Tập ${e.name}${pct > 0 ? `, đã xem ${pct}%` : ''}`}
+                          className={`relative min-h-[44px] py-2 px-2.5 rounded-xl text-xs font-bold border truncate cursor-pointer transition-all flex flex-col items-center justify-center gap-0.5 overflow-hidden ${
                             isCurrent
                               ? 'bg-gradient-to-r from-red-600 to-rose-600 border-red-500 text-white shadow-md shadow-red-600/40 glow-red-sm scale-105'
                               : 'glass-pill border-white/[0.08] text-zinc-300 hover:text-white hover:bg-white/10'
                           }`}
                         >
-                          <span className="truncate">{e.name}</span>
-                          {isWatched && !isCurrent && (
-                            <Check className="w-3 h-3 text-emerald-400 shrink-0" />
+                          <div className="flex items-center gap-1.5 truncate max-w-full">
+                            <span className="truncate">{e.name}</span>
+                            {isCompleted && !isCurrent && (
+                              <Check className="w-3 h-3 text-emerald-400 shrink-0" />
+                            )}
+                          </div>
+                          {pct > 0 && (
+                            <div className="w-full absolute bottom-0 inset-x-0 h-1 bg-black/50 overflow-hidden">
+                              <div
+                                className={`h-full transition-all duration-300 ${
+                                  isCurrent ? 'bg-amber-300 shadow-sm shadow-amber-300' : 'bg-red-500'
+                                }`}
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
                           )}
                         </button>
                       );
@@ -795,6 +1094,9 @@ export const VideoPlayer: React.FC<Props> = ({
       {/* Keyboard Shortcuts Modal */}
       {showShortcutsModal && (
         <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="shortcuts-modal-title"
           className="fixed inset-0 z-50 bg-black/85 backdrop-blur-xl flex items-center justify-center p-4 animate-in fade-in"
           onClick={() => setShowShortcutsModal(false)}
         >
@@ -803,13 +1105,13 @@ export const VideoPlayer: React.FC<Props> = ({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-white/[0.08] pb-3.5">
-              <h3 className="font-black text-white text-base font-heading flex items-center gap-2">
+              <h3 id="shortcuts-modal-title" className="font-black text-white text-base font-heading flex items-center gap-2">
                 <HelpCircle className="w-5 h-5 text-red-500" /> Phím tắt xem phim
               </h3>
               <button
                 onClick={() => setShowShortcutsModal(false)}
-                className="p-1.5 rounded-full text-zinc-400 hover:text-white hover:bg-white/10 cursor-pointer transition-colors"
-                aria-label="Đóng"
+                className="p-1.5 rounded-full text-zinc-400 hover:text-white hover:bg-white/10 cursor-pointer transition-colors focus-visible:ring-2 focus-visible:ring-red-500"
+                aria-label="Đóng bảng phím tắt"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -849,6 +1151,18 @@ export const VideoPlayer: React.FC<Props> = ({
                 <span className="font-semibold text-zinc-200">Toàn màn hình</span>
                 <span className="px-2.5 py-1 bg-white/[0.08] border border-white/[0.1] rounded-lg font-mono text-amber-300 font-bold">
                   F
+                </span>
+              </div>
+              <div className="flex justify-between items-center py-1.5 border-b border-white/[0.05]">
+                <span className="font-semibold text-zinc-200">Rạp phim (Theater Mode)</span>
+                <span className="px-2.5 py-1 bg-white/[0.08] border border-white/[0.1] rounded-lg font-mono text-amber-300 font-bold">
+                  T
+                </span>
+              </div>
+              <div className="flex justify-between items-center py-1.5 border-b border-white/[0.05]">
+                <span className="font-semibold text-zinc-200">Đèn rạp (Ambient Glow)</span>
+                <span className="px-2.5 py-1 bg-white/[0.08] border border-white/[0.1] rounded-lg font-mono text-amber-300 font-bold">
+                  G
                 </span>
               </div>
               <div className="flex justify-between items-center py-1.5">

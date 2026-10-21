@@ -1,4 +1,12 @@
 import type { FavoriteItem, HistoryItem, MovieDetail, MovieItem } from '../types';
+import {
+  MAX_FAVORITES,
+  MAX_HISTORY,
+  normalizeFavorite,
+  normalizeFavorites,
+  normalizeHistoryItem,
+  normalizeHistoryList,
+} from './validation';
 
 const FAVORITES_KEY = 'cineflix_favorites';
 const HISTORY_KEY = 'cineflix_history';
@@ -46,20 +54,12 @@ export function getFavorites(): FavoriteItem[] {
   try {
     const raw = localStorage.getItem(FAVORITES_KEY);
     const parsed = raw ? JSON.parse(raw) : [];
-    memoryFavorites = Array.isArray(parsed)
-      ? parsed.filter((item): item is FavoriteItem => Boolean(item && item.slug && item.name))
-      : [];
+    memoryFavorites = normalizeFavorites(parsed, MAX_FAVORITES);
     return memoryFavorites;
   } catch {
     memoryFavorites = [];
     return [];
   }
-}
-
-export function isFavorite(slug: string): boolean {
-  if (!slug) return false;
-  const list = getFavorites();
-  return list.some((item) => item.slug === slug);
 }
 
 export function toggleFavorite(movie: MovieItem | MovieDetail): boolean {
@@ -98,9 +98,7 @@ export function getHistory(): HistoryItem[] {
   try {
     const raw = localStorage.getItem(HISTORY_KEY);
     const parsed = raw ? JSON.parse(raw) : [];
-    memoryHistory = Array.isArray(parsed)
-      ? parsed.filter((item): item is HistoryItem => Boolean(item && item.slug && item.name))
-      : [];
+    memoryHistory = normalizeHistoryList(parsed, MAX_HISTORY);
     return memoryHistory;
   } catch {
     memoryHistory = [];
@@ -170,28 +168,59 @@ export function exportUserData(): string {
   return JSON.stringify(data, null, 2);
 }
 
+/**
+ * Validate and sanitize user backup payload before committing to storage.
+ * Ensures favorites and history items match strict schema rules and safe URLs.
+ */
+export function validateAndSanitizeBackup(parsed: Record<string, unknown>): {
+  favorites: FavoriteItem[] | null;
+  history: HistoryItem[] | null;
+} | null {
+  const hasFavorites = Array.isArray(parsed.favorites);
+  const hasHistory = Array.isArray(parsed.history);
+  if (!hasFavorites && !hasHistory) return null;
+
+  let nextFavorites: FavoriteItem[] | null = null;
+  let nextHistory: HistoryItem[] | null = null;
+
+  if (hasFavorites) {
+    const raw = parsed.favorites as unknown[];
+    if (raw.some((item) => normalizeFavorite(item) === null)) return null;
+    nextFavorites = normalizeFavorites(raw, MAX_FAVORITES);
+  }
+
+  if (hasHistory) {
+    const raw = parsed.history as unknown[];
+    if (raw.some((item) => normalizeHistoryItem(item) === null)) return null;
+    nextHistory = normalizeHistoryList(raw, MAX_HISTORY);
+  }
+
+  return { favorites: nextFavorites, history: nextHistory };
+}
+
+/**
+ * Validate and import user backup data (favorites + history).
+ * Rejects corrupt data, truncates to maximum capacity, and sanitizes untrusted links.
+ */
 export function importUserData(jsonStr: string): boolean {
   try {
-    const parsed = JSON.parse(jsonStr);
-    let changed = false;
+    const parsed = JSON.parse(jsonStr) as Record<string, unknown>;
+    const validated = validateAndSanitizeBackup(parsed);
+    if (!validated) return false;
 
-    if (Array.isArray(parsed.favorites)) {
-      const validFavs = parsed.favorites.filter((f: any) => f && f.slug && f.name);
-      memoryFavorites = validFavs;
-      safeSetItem(FAVORITES_KEY, JSON.stringify(validFavs));
+    if (validated.favorites) {
+      memoryFavorites = validated.favorites;
+      safeSetItem(FAVORITES_KEY, JSON.stringify(validated.favorites));
       notifyChange(FAVORITES_KEY);
-      changed = true;
     }
 
-    if (Array.isArray(parsed.history)) {
-      const validHistory = parsed.history.filter((h: any) => h && h.slug && h.name);
-      memoryHistory = validHistory;
-      safeSetItem(HISTORY_KEY, JSON.stringify(validHistory));
+    if (validated.history) {
+      memoryHistory = validated.history;
+      safeSetItem(HISTORY_KEY, JSON.stringify(validated.history));
       notifyChange(HISTORY_KEY);
-      changed = true;
     }
 
-    return changed;
+    return true;
   } catch {
     return false;
   }
