@@ -1,33 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  Search,
   Bookmark,
   Menu,
   X,
-  Loader2,
   Sparkles,
   Download,
-  TrendingUp,
-  History,
   Palette,
   Check,
 } from 'lucide-react';
 import { GENRES, COUNTRIES, NAV_TABS } from './constants';
-import { getImageUrl, formatMovieTitle } from '@/shared/api';
 import { THEME_OPTIONS, type ThemeAccent, applyTheme, getStoredTheme } from '@/shared/theme';
 import { NavbarLogo } from './NavbarLogo';
 import { DesktopNav } from './DesktopNav';
+import { SearchBar } from './SearchBar';
 import { useRecentSearches } from './hooks/useRecentSearches';
 import { useNavbarSearch } from './hooks/useNavbarSearch';
-
-const TRENDING_TAGS = [
-  'Phim Chiếu Rạp',
-  'Anime Mới',
-  'Hàn Quốc',
-  'Kinh Dị',
-  'Hành Động',
-  'Gia Đình',
-];
 
 interface Props {
   activeTab: string;
@@ -138,182 +125,27 @@ export const Navbar: React.FC<Props> = ({
 
         {/* Right Search & Utility Buttons */}
         <div className="contents sm:flex sm:items-center sm:gap-2 sm:shrink-0 xl:gap-2.5">
-          <div ref={searchBoxRef} className="relative order-3 w-full sm:order-none sm:w-48 md:w-64 lg:w-72 xl:w-64 2xl:w-72">
-            <form onSubmit={handleSubmit} role="search">
-              <label htmlFor="navbar-search-input" className="sr-only">
-                Tìm kiếm phim, diễn viên
-              </label>
-              <input
-                id="navbar-search-input"
-                ref={searchInputRef}
-                type="text"
-                role="combobox"
-                aria-expanded={showSuggestions}
-                aria-haspopup="listbox"
-                aria-autocomplete="list"
-                aria-controls="navbar-search-suggestions"
-                aria-activedescendant={highlightIdx >= 0 ? `suggestion-item-${highlightIdx}` : undefined}
-                value={q}
-                onFocus={handleFocus}
-                onKeyDown={handleSearchKeyDown}
-                onChange={(e) => handleQueryChange(e.target.value)}
-                placeholder="Tìm phim, diễn viên..."
-                className="w-full h-9 bg-white/[0.06] hover:bg-white/[0.09] text-white placeholder-zinc-400 text-xs sm:text-sm rounded-full pl-8.5 pr-12 py-0 border border-white/[0.1] focus:outline-none focus:border-red-500/80 focus:ring-2 focus:ring-red-500/25 transition-all"
-              />
-              <Search className="w-4 h-4 text-zinc-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-              {q ? (
-                <button
-                  type="button"
-                  aria-label="Xóa từ khóa tìm kiếm"
-                  onClick={clearSearch}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white w-8 h-8 min-w-[32px] min-h-[32px] flex items-center justify-center rounded-full hover:bg-white/10 cursor-pointer transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              ) : (
-                <kbd className="hidden xl:inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[9px] font-bold text-zinc-400 bg-white/[0.08] border border-white/10 rounded absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none select-none">
-                  Ctrl K
-                </kbd>
-              )}
-            </form>
-
-            {/* Suggestions & Discovery Popup */}
-            {showSuggestions && (
-              <div
-                id="navbar-search-suggestions"
-                role="listbox"
-                className="absolute top-full right-0 mt-2 w-full sm:w-96 glass-dropdown rounded-2xl shadow-2xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-150"
-              >
-                {q.trim().length >= 2 ? (
-                  <>
-                    <div className="p-2.5 border-b border-white/[0.08] text-[11px] font-bold text-zinc-400 uppercase tracking-wider flex items-center justify-between">
-                      <span>Kết quả gợi ý</span>
-                      {isSearching && <Loader2 className="w-3.5 h-3.5 text-red-500 animate-spin" />}
-                    </div>
-                    {visibleSuggestions.length === 0 && !isSearching ? (
-                      <div className="p-4 text-center text-xs text-zinc-400">
-                        Không tìm thấy phim phù hợp
-                      </div>
-                    ) : (
-                      <div className="max-h-80 overflow-y-auto divide-y divide-white/[0.05]">
-                        {visibleSuggestions.map((m, idx) => (
-                          <button
-                            id={`suggestion-item-${idx}`}
-                            key={m.slug}
-                            role="option"
-                            aria-selected={highlightIdx === idx}
-                            type="button"
-                            onMouseEnter={() => setHighlightIdx(idx)}
-                            onClick={() => handleSelectSuggestion(m)}
-                            className={`w-full flex items-center gap-3 p-2.5 transition-colors text-left cursor-pointer group ${
-                              highlightIdx === idx ? 'bg-white/[0.14] border-l-2 border-red-500' : 'hover:bg-white/[0.08]'
-                            }`}
-                          >
-                            <img
-                              src={getImageUrl(m.thumb_url || m.poster_url)}
-                              alt={formatMovieTitle(m.name)}
-                              className="w-10 h-14 object-cover rounded-lg bg-zinc-950 shrink-0 border border-white/[0.08] group-hover:border-red-500/40 transition-colors"
-                            />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-xs sm:text-sm font-bold text-zinc-100 group-hover:text-red-400 transition-colors truncate">
-                                {formatMovieTitle(m.name)}
-                              </p>
-                              {m.origin_name && (
-                                <p className="text-[11px] text-zinc-400 truncate italic">
-                                  {m.origin_name}
-                                </p>
-                              )}
-                              <div className="flex items-center gap-2 mt-1 text-[11px] text-zinc-400">
-                                {m.year && <span className="text-zinc-300 font-semibold">{m.year}</span>}
-                                {m.quality && (
-                                  <span className="px-1.5 py-0.2 rounded bg-red-600/80 text-white font-bold">
-                                    {m.quality}
-                                  </span>
-                                )}
-                                {m.episode_current && (
-                                  <span className="text-amber-400 font-medium truncate">
-                                    {m.episode_current}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </button>
-                        ))}
-                        <button
-                          type="button"
-                          onClick={handleSearchAll}
-                          className="w-full p-2.5 text-center text-xs font-bold text-red-400 hover:text-red-300 hover:bg-red-600/10 transition-colors cursor-pointer"
-                        >
-                          Xem tất cả kết quả cho "{q}" →
-                        </button>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="p-3.5 space-y-3.5">
-                    {/* Recent Searches */}
-                    {recentSearches.length > 0 && (
-                      <div>
-                        <div className="flex items-center justify-between text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-2">
-                          <span className="flex items-center gap-1.5">
-                            <History className="w-3.5 h-3.5 text-zinc-400" />
-                            Tìm kiếm gần đây
-                          </span>
-                          <button
-                            type="button"
-                            onClick={clearRecentSearches}
-                            className="text-[11px] text-zinc-400 hover:text-red-400 transition-colors cursor-pointer"
-                          >
-                            Xóa hết
-                          </button>
-                        </div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {recentSearches.map((s) => (
-                            <div
-                              key={s}
-                              onClick={() => handleSelectTag(s)}
-                              className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-xs text-zinc-200 hover:text-white transition-colors cursor-pointer group"
-                            >
-                              <span>{s}</span>
-                              <button
-                                type="button"
-                                onClick={(e) => removeRecentSearch(s, e)}
-                                className="text-zinc-400 hover:text-red-400 p-0.5 cursor-pointer"
-                                title="Xóa"
-                                aria-label={`Xóa lịch sử tìm kiếm ${s}`}
-                              >
-                                <X className="w-3 h-3" />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Trending Searches */}
-                    <div>
-                      <div className="flex items-center gap-1.5 text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-2">
-                        <TrendingUp className="w-3.5 h-3.5 text-red-500" />
-                        Xu hướng tìm kiếm
-                      </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {TRENDING_TAGS.map((tag) => (
-                          <button
-                            key={tag}
-                            type="button"
-                            onClick={() => handleSelectTag(tag)}
-                            className="px-2.5 py-1 rounded-xl glass-pill hover:bg-red-600/20 hover:text-red-300 text-xs text-zinc-300 transition-all cursor-pointer border border-white/10"
-                          >
-                            {tag}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+          <SearchBar
+            q={q}
+            visibleSuggestions={visibleSuggestions}
+            isSearching={isSearching}
+            showSuggestions={showSuggestions}
+            highlightIdx={highlightIdx}
+            recentSearches={recentSearches}
+            searchBoxRef={searchBoxRef}
+            searchInputRef={searchInputRef}
+            onQueryChange={handleQueryChange}
+            onHighlight={setHighlightIdx}
+            onFocus={handleFocus}
+            onKeyDown={handleSearchKeyDown}
+            onSubmit={handleSubmit}
+            onClearSearch={clearSearch}
+            onSelectSuggestion={handleSelectSuggestion}
+            onSearchAll={handleSearchAll}
+            onSelectTag={handleSelectTag}
+            onRemoveRecent={removeRecentSearch}
+            onClearRecent={clearRecentSearches}
+          />
 
           {/* Quick Library Button (Shown on mobile & tablets where nav is collapsed) */}
           <button
