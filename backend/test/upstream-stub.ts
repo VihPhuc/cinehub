@@ -92,6 +92,7 @@ export const defaultStubHandler: StubHandler = (request, response) => {
   if (path === '/v1/api/the-loai/hanh-dong') return sendJson(response, 200, catalogFixture);
   if (path === '/v1/api/quoc-gia/viet-nam') return sendJson(response, 200, catalogFixture);
   if (path === '/v1/api/tim-kiem') return sendJson(response, 200, catalogFixture);
+  if (path === '/phim/missing') return sendJson(response, 404, { status: false, msg: 'not found' });
   if (path.startsWith('/phim/')) return sendJson(response, 200, detailFixture);
   return sendJson(response, 404, { status: false, msg: 'not found' });
 };

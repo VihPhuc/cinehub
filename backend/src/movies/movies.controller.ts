@@ -1,7 +1,8 @@
-import { Controller, Get, Query, Res } from '@nestjs/common';
+import { Controller, Get, Param, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import { CatalogQueryDto } from '../common/dto/catalog-query.dto';
 import { PageQueryDto } from '../common/dto/page-query.dto';
+import { SlugParamDto } from '../common/dto/slug-param.dto';
 import { setCacheHeaders } from '../common/http/cache-headers';
 import { MoviesService } from './movies.service';
 
@@ -26,6 +27,16 @@ export class MoviesController {
   ) {
     const result = await this.movies.getCatalog(query.type, query.page);
     setCacheHeaders(response, result.cache, 30);
+    return result.result;
+  }
+
+  @Get(':slug')
+  async getDetail(
+    @Param() params: SlugParamDto,
+    @Res({ passthrough: true }) response: Response
+  ) {
+    const result = await this.movies.getDetail(params.slug);
+    setCacheHeaders(response, result.cache, 60);
     return result.result;
   }
 }

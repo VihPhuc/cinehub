@@ -4,12 +4,20 @@ import type { CacheStatus } from '../cache/cache.interface';
 import { ttlFor } from '../common/config/ttl';
 import { PhimApiService } from '../upstream/phimapi.service';
 import { UpstreamError } from '../upstream/upstream.errors';
-import type { UpstreamListResponse } from '../upstream/upstream.types';
-import type { MovieListDto } from './dto/movie.dto';
-import { mapListResponse } from './mappers/movie.mapper';
+import type {
+  UpstreamDetailResponse,
+  UpstreamListResponse,
+} from '../upstream/upstream.types';
+import type { MovieDetailResultDto, MovieListDto } from './dto/movie.dto';
+import { mapListResponse, mapMovieDetail } from './mappers/movie.mapper';
 
 export interface MovieListResult {
   result: MovieListDto;
+  cache: CacheStatus;
+}
+
+export interface MovieDetailResult {
+  result: MovieDetailResultDto;
   cache: CacheStatus;
 }
 
@@ -74,5 +82,18 @@ export class MoviesService {
     );
     ensureListResponse(raw.value);
     return { result: mapListResponse(raw.value), cache: raw.cache };
+  }
+
+  async getDetail(slug: string): Promise<MovieDetailResult> {
+    const raw = await this.api.get<UpstreamDetailResponse>(
+      `/phim/${slug}`,
+      {},
+      ttlFor(this.config, 'detail')
+    );
+    const movie = mapMovieDetail(raw.value);
+    if (!movie) {
+      throw new UpstreamError('NOT_FOUND', 'Movie not found');
+    }
+    return { result: { movie }, cache: raw.cache };
   }
 }
