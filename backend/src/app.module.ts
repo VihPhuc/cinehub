@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { CacheModule } from './cache/cache.module';
 import { CompatModule } from './compat/compat.module';
 import configuration from './common/config/configuration';
@@ -16,11 +18,26 @@ import { UpstreamModule } from './upstream/upstream.module';
       validationSchema: envValidationSchema,
       validationOptions: { abortEarly: false },
     }),
+    ThrottlerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => [
+        {
+          ttl: config.getOrThrow<number>('rateLimit.ttlMs'),
+          limit: config.getOrThrow<number>('rateLimit.limit'),
+        },
+      ],
+    }),
     CacheModule,
     UpstreamModule,
     CompatModule,
     MoviesModule,
     HealthModule,
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
   ],
 })
 export class AppModule {}
