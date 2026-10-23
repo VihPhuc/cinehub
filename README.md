@@ -8,6 +8,18 @@
 - PWA: cài đặt, offline app shell, cache API/ảnh có giới hạn và TTL.
 - Deep link chia sẻ được trạng thái tab, tìm kiếm, phim đang xem và tập phim.
 
+## Dự án được xây dựng thế nào
+
+Đây là dự án học tập có sử dụng AI ("vibe coding"). Toàn bộ code ứng dụng được
+sinh ra bằng công cụ AI; mình đặt yêu cầu, làm việc với AI và hiện đang đọc lại
+codebase để hiểu, sửa lỗi và tự kiểm thử.
+
+Mình không trình bày dự án này như code tự viết tay. Trọng tâm hiện tại:
+
+- Hiểu luồng dữ liệu: URL state → API → cache → player.
+- Tái hiện và sửa lỗi.
+- Viết test và tập giải thích kiến trúc.
+
 ## Chạy local
 
 Yêu cầu Node.js 22+ (khuyến nghị) và npm.
