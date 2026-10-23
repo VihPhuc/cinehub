@@ -216,9 +216,11 @@ Trách nhiệm từng file:
   - Layout header hiện tại.
   - State `menuOpen`.
   - Gọi `useThemeAccent` để giữ một nguồn theme duy nhất.
+  - Gọi `useRecentSearches` + `useNavbarSearch` để giữ search state tại một chỗ, vì logo cần clear query khi về trang chủ.
   - Ghép `NavbarLogo`, `DesktopNav`, `SearchBar`, `ThemePicker`, các nút utility, `MobileDrawer`.
 - `NavbarLogo.tsx`
   - Logo + click về trang chủ.
+  - Nhận `onHome`; `Navbar` truyền callback gọi `onSelectTab('home')` và `clearQuery()`.
 - `DesktopNav.tsx`
   - Nav tabs desktop.
   - Tự giữ `openDropdown: 'genre' | 'country' | null`.
@@ -226,8 +228,8 @@ Trách nhiệm từng file:
   - Nút Tủ Phim.
 - `SearchBar.tsx`
   - Input search + phím tắt + render `SearchSuggestions`.
-  - Dùng `useNavbarSearch` và `useRecentSearches`.
-  - Nhận `onCloseMobileMenu` để đóng drawer khi submit/chọn tag.
+  - Presentational: nhận query, suggestions, recent searches và handlers từ `Navbar`.
+  - Không tự gọi hook search; tránh hai nguồn state và giữ hành vi logo clear query.
 - `SearchSuggestions.tsx`
   - Chỉ render panel: kết quả tìm kiếm / gần đây / xu hướng.
   - Không gọi API, không giữ state search.
@@ -248,14 +250,17 @@ Hooks:
   - Đọc/ghi `cinehub_recent_searches`.
   - Tối đa 5 mục, không trùng không phân biệt hoa/thường.
   - Trả `recentSearches`, `saveRecentSearch`, `removeRecentSearch`, `clearRecentSearches`.
+  - Được gọi một lần trong `Navbar`, truyền data/handler xuống `SearchBar`.
 - `useNavbarSearch({ onSearch, onSelectMovie, onCloseMobileMenu, saveRecentSearch })`
-  - `q`, `suggestions`, `isSearching`, `showSuggestions`, `highlightIdx`.
+  - `q`, `setQ`, `suggestions`, `isSearching`, `showSuggestions`, `highlightIdx`.
   - Refs: `searchBoxRef`, `searchInputRef`.
+  - `clearQuery()` để logo reset input như hành vi hiện tại.
   - Debounce khi `q.trim().length >= 2`.
   - Ctrl/Cmd+K và `/` focus search.
   - ArrowUp/ArrowDown/Enter/Escape.
   - Chọn suggestion, chọn tag, submit.
   - Click outside đóng suggestions.
+  - Được gọi một lần trong `Navbar`; `SearchBar` chỉ nhận props.
 - `useThemeAccent(onThemeChange?)`
   - Được gọi một lần trong `Navbar` để tránh hai nguồn theme lệch nhau.
   - Trả `currentTheme`, `showThemePicker`, `themePickerRef`, `toggleThemePicker`, `closeThemePicker`, `selectTheme`.
