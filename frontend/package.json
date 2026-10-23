@@ -1,5 +1,5 @@
 {
-  "name": "movie-web",
+  "name": "cinehub-web",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -9,9 +9,6 @@
     "lint": "oxlint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check:bundle": "node scripts/check-bundle.mjs",
-    "check:deploy": "node scripts/check-deploy.mjs",
-    "check:mojibake": "node scripts/check-mojibake.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
