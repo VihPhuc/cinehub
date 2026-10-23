@@ -238,7 +238,7 @@ export const Navbar: React.FC<Props> = ({
   };
   return (
     <header className="sticky top-0 z-40 w-full bg-[#090a0f]/85 backdrop-blur-xl border-b border-white/[0.08] transition-all">
-      <div className="w-full max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-3 2xl:gap-6">
+      <div className="w-full max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 min-h-16 flex flex-wrap items-center justify-between gap-3 py-2 sm:h-16 sm:flex-nowrap sm:py-0 2xl:gap-6">
         {/* Left Section: Logo & Desktop Navigation */}
         <div className="flex items-center gap-3 2xl:gap-8 min-w-0">
           {/* Logo */}
@@ -378,8 +378,8 @@ export const Navbar: React.FC<Props> = ({
         </div>
 
         {/* Right Search & Utility Buttons */}
-        <div className="flex items-center gap-2 xl:gap-2.5 shrink-0">
-          <div ref={searchBoxRef} className="relative w-48 sm:w-64 lg:w-72 xl:w-64 2xl:w-72">
+        <div className="contents sm:flex sm:items-center sm:gap-2 sm:shrink-0 xl:gap-2.5">
+          <div ref={searchBoxRef} className="relative order-3 w-full sm:order-none sm:w-48 md:w-64 lg:w-72 xl:w-64 2xl:w-72">
             <form onSubmit={onSubmit} role="search">
               <label htmlFor="navbar-search-input" className="sr-only">
                 Tìm kiếm phim, diễn viên
@@ -432,7 +432,7 @@ export const Navbar: React.FC<Props> = ({
               <div
                 id="navbar-search-suggestions"
                 role="listbox"
-                className="absolute top-full right-0 mt-2 w-80 sm:w-96 glass-dropdown rounded-2xl shadow-2xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-150"
+                className="absolute top-full right-0 mt-2 w-full sm:w-96 glass-dropdown rounded-2xl shadow-2xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-150"
               >
                 {q.trim().length >= 2 ? (
                   <>
@@ -592,7 +592,7 @@ export const Navbar: React.FC<Props> = ({
           {onRandomMovie && (
             <button
               onClick={onRandomMovie}
-              className="flex items-center justify-center w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl glass-pill hover:bg-amber-500/10 text-amber-300 border border-amber-500/30 hover:border-amber-500/60 transition-all cursor-pointer shadow-sm hover:scale-105 active:scale-95 shrink-0"
+              className="hidden sm:flex items-center justify-center w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl glass-pill hover:bg-amber-500/10 text-amber-300 border border-amber-500/30 hover:border-amber-500/60 transition-all cursor-pointer shadow-sm hover:scale-105 active:scale-95 shrink-0"
               title="Phim ngẫu nhiên: Chọn một phim bất ngờ"
               aria-label="Phim Ngẫu Nhiên"
             >
@@ -601,7 +601,7 @@ export const Navbar: React.FC<Props> = ({
           )}
 
           {/* Theme Accent Picker */}
-          <div className="relative shrink-0" ref={themePickerRef}>
+          <div className="relative order-2 ml-auto shrink-0 sm:order-none sm:ml-0" ref={themePickerRef}>
             <button
               type="button"
               onClick={() => setShowThemePicker(!showThemePicker)}
@@ -622,7 +622,7 @@ export const Navbar: React.FC<Props> = ({
                 id="theme-picker-popover"
                 role="dialog"
                 aria-label="Bảng chọn tông màu giao diện"
-                className="absolute top-full right-0 mt-2 w-72 sm:w-80 glass-dropdown rounded-2xl p-3 shadow-2xl z-50 animate-in fade-in slide-in-from-top-2 duration-150 border border-white/15"
+                className="absolute top-[calc(100%+4rem)] -right-14 w-[calc(100vw-2rem)] sm:top-[calc(100%+0.625rem)] sm:right-0 sm:w-80 glass-dropdown rounded-2xl p-3 shadow-2xl z-50 animate-in fade-in slide-in-from-top-2 duration-150 border border-white/15"
               >
                 <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/[0.08]">
                   <span className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
@@ -680,7 +680,7 @@ export const Navbar: React.FC<Props> = ({
           {/* Mobile menu toggle button */}
           <button
             onClick={() => setMenuOpen(!menuOpen)}
-            className="xl:hidden w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl bg-white/[0.06] border border-white/[0.1] text-zinc-300 hover:text-white cursor-pointer transition-colors shrink-0 focus-visible:ring-2 focus-visible:ring-red-500"
+            className="order-2 xl:hidden sm:order-none w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl bg-white/[0.06] border border-white/[0.1] text-zinc-300 hover:text-white cursor-pointer transition-colors shrink-0 focus-visible:ring-2 focus-visible:ring-red-500"
             aria-label={menuOpen ? "Đóng danh mục menu" : "Mở danh mục menu"}
             aria-expanded={menuOpen}
             aria-controls="mobile-nav-drawer"
@@ -692,7 +692,7 @@ export const Navbar: React.FC<Props> = ({
 
       {/* Mobile Drawer */}
       {menuOpen && (
-        <div id="mobile-nav-drawer" className="xl:hidden border-t border-white/[0.08] bg-[#090a0f]/95 backdrop-blur-2xl px-4 py-4 space-y-4 max-h-[calc(100vh-4rem)] overflow-y-auto shadow-2xl animate-in fade-in slide-in-from-top-4 duration-200">
+        <div id="mobile-nav-drawer" className="xl:hidden border-t border-white/[0.08] bg-[#090a0f]/95 backdrop-blur-2xl px-4 py-4 space-y-4 max-h-[80vh] overflow-y-auto shadow-2xl animate-in fade-in slide-in-from-top-4 duration-200">
           <div className="grid grid-cols-2 gap-2">
             {NAV_TABS.filter((t) => !['genres', 'countries', 'library'].includes(t.id)).map((t) => (
               <button
