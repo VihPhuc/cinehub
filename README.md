@@ -47,6 +47,25 @@ npm run check:mojibake # phát hiện lỗi encoding trong source
 
 CI tại `.github/workflows/verify.yml` cài đặt và kiểm tra cả hai package `frontend/` và `backend/` khi push/PR.
 
+## Backend (phase 1)
+
+Backend NestJS nằm trong `backend/`, cung cấp proxy/cache PhimAPI và API chuẩn hóa.
+
+```bash
+cd backend
+npm ci
+npm run start:dev
+```
+
+- Health: `http://localhost:3001/api/health`
+- Swagger: `http://localhost:3001/api/docs`
+- Frontend compat base: `http://localhost:3001/api/compat`
+- Contract cho frontend: `docs/backend-api.md`
+
+Backend không proxy HLS/iframe; player vẫn dùng URL stream trực tiếp. Đặt
+`VITE_API_BASE_URL=http://localhost:3001/api/compat` để frontend đi qua backend;
+nếu không, frontend vẫn fallback về PhimAPI trực tiếp.
+
 ## Cấu trúc chính
 
 ```text
@@ -63,7 +82,7 @@ frontend/
     shared/               api, storage, tmdb, validation, theme, types
   public/                 sw.js, manifest, icons
   vite/vitest/tsconfig    cấu hình riêng của frontend
-backend/                  NestJS API hiện có
+backend/                  NestJS proxy/cache + normalized API
 scripts/                  bundle/deploy/encoding guards, icon generator
 docs/                     spec và implementation plan
 .github/workflows/        verify.yml
@@ -85,8 +104,9 @@ Các tham số được hỗ trợ: `tab`, `genre`, `country`, `q`, `page`, `inf
   - `cinehub-images-v1` — ảnh, giới hạn số entry
 - Khi build thay đổi asset, bump shell cache trong `frontend/public/sw.js`.
 
-> Backend hiện chỉ có endpoint `/api/health`. Các module compat/catalog/search/detail
-> trong tài liệu cũ chưa được implement; frontend mặc định gọi trực tiếp `https://phimapi.com`.
+> Backend có compat (`/api/compat/*`) và normalized (`/api/v1/*`) routes. Frontend
+> mặc định vẫn gọi trực tiếp `https://phimapi.com` cho đến khi đặt
+> `VITE_API_BASE_URL=http://localhost:3001/api/compat`; xem `docs/backend-api.md` để tích hợp.
 
 ## Bảo mật
 

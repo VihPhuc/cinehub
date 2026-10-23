@@ -2,8 +2,9 @@
 
 Cập nhật: 2026-10-23 (sau refactor frontend/backend)
 
-> Repo đã tách thành `frontend/` và `backend/`. Backend hiện chỉ có endpoint
-> `/api/health`; các module compat/catalog/search/detail chưa được implement.
+> Repo đã tách thành `frontend/` và `backend/`. Backend đã có compat
+> (`/api/compat/*`) và normalized (`/api/v1/*`), CORS/rate limit/Swagger; xem
+> `docs/backend-api.md` để tích hợp.
 
 ## Trạng thái các luồng
 
@@ -84,7 +85,7 @@ Chạy tại `D:\Phim`:
 
 ```text
 npm run test:web        -> 8 test files, 61 tests passed
-npm run test:api        -> 27 unit + 2 e2e passed
+npm run test:api        -> 27 unit + 27 e2e passed
 npm run lint            -> clean (frontend + backend)
 npm run build:web       -> pass (tsc -b + vite build)
 npm run build:api       -> pass (nest build)
@@ -122,6 +123,15 @@ Kiểm tra thủ công bằng Chrome headless + CDP trên `vite preview`:
     - Đã cập nhật `connect-src` trong [frontend/vite.config.ts](file:///d:/Phim/frontend/vite.config.ts) CSP cho phép `http://localhost:3001` và `http://127.0.0.1:3001`.
     - Đã cập nhật [frontend/public/sw.js](file:///d:/Phim/frontend/public/sw.js) nhận diện các route `/api/compat` và `/api/v1` vào cache API `cinehub-api-v3`.
     - Đã bổ sung bộ unit test trong [frontend/src/shared/sw.test.ts](file:///d:/Phim/frontend/src/shared/sw.test.ts) kiểm chứng luồng định tuyến cache của `/api/compat` và `/api/v1`. Toàn bộ 61/61 test frontend pass 100%.
-    - Frontend đã sẵn sàng cấu hình `VITE_API_BASE_URL`; backend hiện chỉ có `/api/health`, chưa implement các module compat/catalog/search/detail.
+    - Frontend đã sẵn sàng cấu hình `VITE_API_BASE_URL`.
+
+### Backend implementation
+
+- Backend NestJS nằm trong `backend/`; không sửa frontend trong đợt này.
+- Compat: `/api/compat/*` giữ nguyên path/JSON PhimAPI; đặt `VITE_API_BASE_URL=http://localhost:3001/api/compat`.
+- Normalized: `/api/v1/*`; contract đầy đủ tại `docs/backend-api.md`.
+- Cache in-memory TTL + LRU, single-flight; chưa có auth/DB/Redis.
+- CORS mặc định cho `http://localhost:5173` và `http://localhost:4173`; rate limit 120 request/phút.
+- Trạng thái: backend routes và security đã có test; chờ xác nhận 6 luồng compat (home, catalog, genre, country, search, detail/watch) từ frontend.
 
 

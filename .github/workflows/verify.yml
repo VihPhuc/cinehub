@@ -27,3 +27,21 @@ jobs:
       - run: npm ci --prefix frontend
       - run: npm ci --prefix backend
       - run: npm run verify
+
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run test:e2e
+      - run: npm run lint
+      - run: npm run build
