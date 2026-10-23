@@ -238,9 +238,9 @@ export const Navbar: React.FC<Props> = ({
   };
   return (
     <header className="sticky top-0 z-40 w-full bg-[#090a0f]/85 backdrop-blur-xl border-b border-white/[0.08] transition-all">
-      <div className="w-full max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-3 xl:gap-6">
+      <div className="w-full max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-3 2xl:gap-6">
         {/* Left Section: Logo & Desktop Navigation */}
-        <div className="flex items-center gap-3 xl:gap-8 min-w-0">
+        <div className="flex items-center gap-3 2xl:gap-8 min-w-0">
           {/* Logo */}
           <button
             onClick={() => {
@@ -264,14 +264,14 @@ export const Navbar: React.FC<Props> = ({
           </button>
 
           {/* Desktop Nav Items */}
-          <nav className="hidden lg:flex items-center gap-1 xl:gap-1.5 shrink-0">
+          <nav className="hidden xl:flex items-center gap-1 2xl:gap-1.5 shrink-0">
             {NAV_TABS.filter((t) => !['genres', 'countries', 'library'].includes(t.id)).map((t) => {
               const isActive = activeTab === t.id;
               return (
                 <button
                   key={t.id}
                   onClick={() => onSelectTab(t.id)}
-                  className={`relative h-9 px-2.5 xl:px-3 text-xs xl:text-sm whitespace-nowrap shrink-0 transition-colors duration-200 cursor-pointer inline-flex items-center justify-center rounded-lg ${
+                  className={`relative h-9 px-2.5 2xl:px-3 text-xs 2xl:text-sm whitespace-nowrap shrink-0 transition-colors duration-200 cursor-pointer inline-flex items-center justify-center rounded-lg ${
                     isActive
                       ? 'text-white font-bold after:absolute after:bottom-0 after:left-2 after:right-2 after:h-0.5 after:bg-gradient-to-r after:from-red-500 after:via-rose-500 after:to-amber-500 after:rounded-full after:shadow-[0_0_10px_rgba(239,68,68,0.9)]'
                       : 'text-zinc-400 hover:text-white font-medium hover:bg-white/[0.05]'
@@ -279,7 +279,7 @@ export const Navbar: React.FC<Props> = ({
                 >
                   {t.id === 'hoat-hinh' ? (
                     <span>
-                      Anime<span className="hidden xl:inline"> / Hoạt Hình</span>
+                      Anime<span className="hidden 2xl:inline"> / Hoạt Hình</span>
                     </span>
                   ) : (
                     <span>{t.label}</span>
@@ -292,7 +292,7 @@ export const Navbar: React.FC<Props> = ({
             <div className="relative shrink-0" onMouseLeave={() => setOpenDropdown(null)}>
               <button
                 onClick={() => setOpenDropdown(openDropdown === 'genre' ? null : 'genre')}
-                className={`h-9 px-2.5 xl:px-3 text-xs xl:text-sm whitespace-nowrap shrink-0 inline-flex items-center gap-1 transition-colors cursor-pointer rounded-lg ${
+                className={`h-9 px-2.5 2xl:px-3 text-xs 2xl:text-sm whitespace-nowrap shrink-0 inline-flex items-center gap-1 transition-colors cursor-pointer rounded-lg ${
                   activeTab === 'genre'
                     ? 'text-white font-bold relative after:absolute after:bottom-0 after:left-2 after:right-2 after:h-0.5 after:bg-gradient-to-r after:from-red-500 after:via-rose-500 after:to-amber-500 after:rounded-full after:shadow-[0_0_10px_rgba(239,68,68,0.9)]'
                     : 'text-zinc-400 hover:text-white font-medium hover:bg-white/[0.05]'
@@ -302,23 +302,25 @@ export const Navbar: React.FC<Props> = ({
                 <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 shrink-0 ${openDropdown === 'genre' ? 'rotate-180' : ''}`} />
               </button>
               {openDropdown === 'genre' && (
-                <div className="absolute top-full left-0 mt-2 w-80 glass-dropdown rounded-2xl p-2.5 grid grid-cols-2 gap-1 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
-                  <div className="col-span-2 px-2 py-1 text-[11px] font-bold text-zinc-400 uppercase tracking-wider border-b border-white/[0.08] mb-1">
-                    Khám phá thể loại
+                <div className="absolute top-full left-0 pt-2 w-80 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                  <div className="glass-dropdown rounded-2xl p-2.5 grid grid-cols-2 gap-1">
+                    <div className="col-span-2 px-2 py-1 text-[11px] font-bold text-zinc-400 uppercase tracking-wider border-b border-white/[0.08] mb-1">
+                      Khám phá thể loại
+                    </div>
+                    {GENRES.map((g) => (
+                      <button
+                        key={g.slug}
+                        onClick={() => {
+                          onSelectGenre(g.slug, g.name);
+                          setOpenDropdown(null);
+                        }}
+                        className="flex items-center gap-2 text-left text-xs px-2.5 py-2 rounded-lg hover:bg-red-600/20 hover:text-red-300 text-zinc-300 transition-colors cursor-pointer group"
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full bg-zinc-600 group-hover:bg-red-500 transition-colors shrink-0" />
+                        <span className="truncate">{g.name}</span>
+                      </button>
+                    ))}
                   </div>
-                  {GENRES.map((g) => (
-                    <button
-                      key={g.slug}
-                      onClick={() => {
-                        onSelectGenre(g.slug, g.name);
-                        setOpenDropdown(null);
-                      }}
-                      className="flex items-center gap-2 text-left text-xs px-2.5 py-2 rounded-lg hover:bg-red-600/20 hover:text-red-300 text-zinc-300 transition-colors cursor-pointer group"
-                    >
-                      <span className="w-1.5 h-1.5 rounded-full bg-zinc-600 group-hover:bg-red-500 transition-colors shrink-0" />
-                      <span className="truncate">{g.name}</span>
-                    </button>
-                  ))}
                 </div>
               )}
             </div>
@@ -327,7 +329,7 @@ export const Navbar: React.FC<Props> = ({
             <div className="relative shrink-0" onMouseLeave={() => setOpenDropdown(null)}>
               <button
                 onClick={() => setOpenDropdown(openDropdown === 'country' ? null : 'country')}
-                className={`h-9 px-2.5 xl:px-3 text-xs xl:text-sm whitespace-nowrap shrink-0 inline-flex items-center gap-1 transition-colors cursor-pointer rounded-lg ${
+                className={`h-9 px-2.5 2xl:px-3 text-xs 2xl:text-sm whitespace-nowrap shrink-0 inline-flex items-center gap-1 transition-colors cursor-pointer rounded-lg ${
                   activeTab === 'country'
                     ? 'text-white font-bold relative after:absolute after:bottom-0 after:left-2 after:right-2 after:h-0.5 after:bg-gradient-to-r after:from-red-500 after:via-rose-500 after:to-amber-500 after:rounded-full after:shadow-[0_0_10px_rgba(239,68,68,0.9)]'
                     : 'text-zinc-400 hover:text-white font-medium hover:bg-white/[0.05]'
@@ -337,23 +339,25 @@ export const Navbar: React.FC<Props> = ({
                 <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 shrink-0 ${openDropdown === 'country' ? 'rotate-180' : ''}`} />
               </button>
               {openDropdown === 'country' && (
-                <div className="absolute top-full left-0 mt-2 w-64 glass-dropdown rounded-2xl p-2.5 grid grid-cols-2 gap-1 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
-                  <div className="col-span-2 px-2 py-1 text-[11px] font-bold text-zinc-400 uppercase tracking-wider border-b border-white/[0.08] mb-1">
-                    Chọn quốc gia
+                <div className="absolute top-full left-0 pt-2 w-64 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                  <div className="glass-dropdown rounded-2xl p-2.5 grid grid-cols-2 gap-1">
+                    <div className="col-span-2 px-2 py-1 text-[11px] font-bold text-zinc-400 uppercase tracking-wider border-b border-white/[0.08] mb-1">
+                      Chọn quốc gia
+                    </div>
+                    {COUNTRIES.map((c) => (
+                      <button
+                        key={c.slug}
+                        onClick={() => {
+                          onSelectCountry(c.slug, c.name);
+                          setOpenDropdown(null);
+                        }}
+                        className="flex items-center gap-2 text-left text-xs px-2.5 py-2 rounded-lg hover:bg-red-600/20 hover:text-red-300 text-zinc-300 transition-colors cursor-pointer group"
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full bg-zinc-600 group-hover:bg-red-500 transition-colors shrink-0" />
+                        <span className="truncate">{c.name}</span>
+                      </button>
+                    ))}
                   </div>
-                  {COUNTRIES.map((c) => (
-                    <button
-                      key={c.slug}
-                      onClick={() => {
-                        onSelectCountry(c.slug, c.name);
-                        setOpenDropdown(null);
-                      }}
-                      className="flex items-center gap-2 text-left text-xs px-2.5 py-2 rounded-lg hover:bg-red-600/20 hover:text-red-300 text-zinc-300 transition-colors cursor-pointer group"
-                    >
-                      <span className="w-1.5 h-1.5 rounded-full bg-zinc-600 group-hover:bg-red-500 transition-colors shrink-0" />
-                      <span className="truncate">{c.name}</span>
-                    </button>
-                  ))}
                 </div>
               )}
             </div>
@@ -361,7 +365,7 @@ export const Navbar: React.FC<Props> = ({
             {/* Library Link (Tủ Phim) */}
             <button
               onClick={() => onSelectTab('library')}
-              className={`h-9 px-2.5 xl:px-3 text-xs xl:text-sm whitespace-nowrap shrink-0 inline-flex items-center gap-1.5 rounded-lg transition-colors cursor-pointer ${
+              className={`h-9 px-2.5 2xl:px-3 text-xs 2xl:text-sm whitespace-nowrap shrink-0 inline-flex items-center gap-1.5 rounded-lg transition-colors cursor-pointer ${
                 activeTab === 'library'
                   ? 'text-white font-bold relative after:absolute after:bottom-0 after:left-2 after:right-2 after:h-0.5 after:bg-gradient-to-r after:from-red-500 after:via-rose-500 after:to-amber-500 after:rounded-full after:shadow-[0_0_10px_rgba(239,68,68,0.9)]'
                   : 'text-zinc-400 hover:text-white font-medium hover:bg-white/[0.05]'
@@ -375,7 +379,7 @@ export const Navbar: React.FC<Props> = ({
 
         {/* Right Search & Utility Buttons */}
         <div className="flex items-center gap-2 xl:gap-2.5 shrink-0">
-          <div ref={searchBoxRef} className="relative w-48 sm:w-64 lg:w-72">
+          <div ref={searchBoxRef} className="relative w-48 sm:w-64 lg:w-72 xl:w-64 2xl:w-72">
             <form onSubmit={onSubmit} role="search">
               <label htmlFor="navbar-search-input" className="sr-only">
                 Tìm kiếm phim, diễn viên
@@ -573,7 +577,7 @@ export const Navbar: React.FC<Props> = ({
           {/* Quick Library Button (Shown on mobile & tablets where nav is collapsed) */}
           <button
             onClick={() => onSelectTab('library')}
-            className={`hidden sm:flex lg:hidden items-center justify-center w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl border transition-all cursor-pointer shrink-0 ${
+            className={`hidden sm:flex xl:hidden items-center justify-center w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl border transition-all cursor-pointer shrink-0 ${
               activeTab === 'library'
                 ? 'bg-red-600/25 border-red-500/40 text-red-400 shadow-sm shadow-red-500/20'
                 : 'glass-pill text-zinc-300 hover:text-white hover:bg-white/15 border-white/10'
@@ -676,7 +680,7 @@ export const Navbar: React.FC<Props> = ({
           {/* Mobile menu toggle button */}
           <button
             onClick={() => setMenuOpen(!menuOpen)}
-            className="lg:hidden w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl bg-white/[0.06] border border-white/[0.1] text-zinc-300 hover:text-white cursor-pointer transition-colors shrink-0 focus-visible:ring-2 focus-visible:ring-red-500"
+            className="xl:hidden w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl bg-white/[0.06] border border-white/[0.1] text-zinc-300 hover:text-white cursor-pointer transition-colors shrink-0 focus-visible:ring-2 focus-visible:ring-red-500"
             aria-label={menuOpen ? "Đóng danh mục menu" : "Mở danh mục menu"}
             aria-expanded={menuOpen}
             aria-controls="mobile-nav-drawer"
@@ -688,7 +692,7 @@ export const Navbar: React.FC<Props> = ({
 
       {/* Mobile Drawer */}
       {menuOpen && (
-        <div id="mobile-nav-drawer" className="lg:hidden border-t border-white/[0.08] bg-[#090a0f]/95 backdrop-blur-2xl px-4 py-4 space-y-4 max-h-[calc(100vh-4rem)] overflow-y-auto shadow-2xl animate-in fade-in slide-in-from-top-4 duration-200">
+        <div id="mobile-nav-drawer" className="xl:hidden border-t border-white/[0.08] bg-[#090a0f]/95 backdrop-blur-2xl px-4 py-4 space-y-4 max-h-[calc(100vh-4rem)] overflow-y-auto shadow-2xl animate-in fade-in slide-in-from-top-4 duration-200">
           <div className="grid grid-cols-2 gap-2">
             {NAV_TABS.filter((t) => !['genres', 'countries', 'library'].includes(t.id)).map((t) => (
               <button
