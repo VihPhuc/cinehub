@@ -1,0 +1,21 @@
+{
+  "name": "cinehub",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "npm --prefix frontend run dev",
+    "dev:api": "npm --prefix backend run start:dev",
+    "preview": "npm --prefix frontend run preview",
+    "build": "npm --prefix frontend run build",
+    "build:web": "npm --prefix frontend run build",
+    "build:api": "npm --prefix backend run build",
+    "test": "npm run test:web && npm run test:api",
+    "test:web": "npm --prefix frontend run test",
+    "test:api": "npm --prefix backend run test && npm --prefix backend run test:e2e",
+    "lint": "npm --prefix frontend run lint && npm --prefix backend run lint",
+    "check:bundle": "node scripts/check-bundle.mjs",
+    "check:deploy": "node scripts/check-deploy.mjs",
+    "check:mojibake": "node scripts/check-mojibake.mjs",
+    "verify": "npm run test && npm run lint && npm run build:web && npm run build:api && npm run check:bundle && npm run check:deploy && npm run check:mojibake"
+  }
+}

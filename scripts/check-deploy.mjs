@@ -17,7 +17,7 @@ function required(file, checks) {
   }
 }
 
-required('dist/_headers', [
+required('frontend/dist/_headers', [
   /Content-Security-Policy:/,
   /frame-ancestors 'none'/,
   /X-Content-Type-Options: nosniff/,
@@ -28,6 +28,6 @@ required('dist/_headers', [
   /Cache-Control: no-cache/,
 ]);
 
-required('dist/_redirects', [/\/\*\s+\/index\.html\s+200/]);
+required('frontend/dist/_redirects', [/\/\*\s+\/index\.html\s+200/]);
 
 console.log('Deploy guard passed: security headers and SPA fallback are generated.');

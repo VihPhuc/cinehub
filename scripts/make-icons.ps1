@@ -1,10 +1,13 @@
 Add-Type -AssemblyName System.Drawing
 
+$repoRoot = Split-Path -Parent $PSScriptRoot
+$publicDir = Join-Path $repoRoot 'frontend/public'
+
 $configs = @(
-    @{ Size = 192; Path = "public/icon-192.png"; Maskable = $false },
-    @{ Size = 512; Path = "public/icon-512.png"; Maskable = $false },
-    @{ Size = 512; Path = "public/icon-maskable-512.png"; Maskable = $true },
-    @{ Size = 180; Path = "public/apple-touch-icon.png"; Maskable = $false }
+    @{ Size = 192; Path = (Join-Path $publicDir 'icon-192.png'); Maskable = $false },
+    @{ Size = 512; Path = (Join-Path $publicDir 'icon-512.png'); Maskable = $false },
+    @{ Size = 512; Path = (Join-Path $publicDir 'icon-maskable-512.png'); Maskable = $true },
+    @{ Size = 180; Path = (Join-Path $publicDir 'apple-touch-icon.png'); Maskable = $false }
 )
 
 foreach ($c in $configs) {
