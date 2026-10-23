@@ -13,12 +13,12 @@ import {
   Check,
 } from 'lucide-react';
 import { GENRES, COUNTRIES, NAV_TABS } from './constants';
-import { searchMovies, getImageUrl, formatMovieTitle } from '@/shared/api';
-import type { MovieItem } from '@/shared/types';
+import { getImageUrl, formatMovieTitle } from '@/shared/api';
 import { THEME_OPTIONS, type ThemeAccent, applyTheme, getStoredTheme } from '@/shared/theme';
 import { NavbarLogo } from './NavbarLogo';
 import { DesktopNav } from './DesktopNav';
 import { useRecentSearches } from './hooks/useRecentSearches';
+import { useNavbarSearch } from './hooks/useNavbarSearch';
 
 const TRENDING_TAGS = [
   'Phim Chiếu Rạp',
@@ -54,14 +54,7 @@ export const Navbar: React.FC<Props> = ({
   canInstallPwa,
   onThemeChange,
 }) => {
-  const [q, setQ] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
-  const [suggestions, setSuggestions] = useState<MovieItem[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [highlightIdx, setHighlightIdx] = useState(-1);
-  const searchBoxRef = useRef<HTMLDivElement>(null);
-  const searchInputRef = useRef<HTMLInputElement>(null);
   const [currentTheme, setCurrentTheme] = useState<ThemeAccent>(() => getStoredTheme());
   const [showThemePicker, setShowThemePicker] = useState(false);
   const themePickerRef = useRef<HTMLDivElement>(null);
@@ -73,32 +66,30 @@ export const Navbar: React.FC<Props> = ({
     clearRecentSearches,
   } = useRecentSearches();
 
-  const handleSelectTag = (tag: string) => {
-    setQ(tag);
-    saveRecentSearch(tag);
-    setShowSuggestions(false);
-    onSearch(tag);
-    setMenuOpen(false);
-  };
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return;
-
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
-        e.preventDefault();
-        searchInputRef.current?.focus();
-        setShowSuggestions(true);
-      } else if (e.key === '/' && !e.ctrlKey && !e.metaKey) {
-        e.preventDefault();
-        searchInputRef.current?.focus();
-        setShowSuggestions(true);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  const {
+    q,
+    visibleSuggestions,
+    isSearching,
+    showSuggestions,
+    highlightIdx,
+    setHighlightIdx,
+    searchBoxRef,
+    searchInputRef,
+    handleQueryChange,
+    handleFocus,
+    clearQuery,
+    clearSearch,
+    handleSelectSuggestion,
+    handleSearchAll,
+    handleSelectTag,
+    handleSearchKeyDown,
+    handleSubmit,
+  } = useNavbarSearch({
+    onSearch,
+    onSelectMovie,
+    onCloseMobileMenu: () => setMenuOpen(false),
+    saveRecentSearch,
+  });
 
   useEffect(() => {
     if (!showThemePicker) return;
@@ -125,90 +116,6 @@ export const Navbar: React.FC<Props> = ({
     onThemeChange?.(themeId);
   };
 
-  useEffect(() => {
-    if (!q.trim() || q.trim().length < 2) return;
-
-    const abortCtrl = new AbortController();
-    const timer = setTimeout(() => {
-      setIsSearching(true);
-      searchMovies(q.trim(), 1, abortCtrl.signal)
-        .then((res) => {
-          if (!abortCtrl.signal.aborted) {
-            setSuggestions(res.items.slice(0, 6));
-            setIsSearching(false);
-          }
-        })
-        .catch(() => {
-          if (!abortCtrl.signal.aborted) {
-            setIsSearching(false);
-          }
-        });
-    }, 250);
-
-    return () => {
-      clearTimeout(timer);
-      abortCtrl.abort();
-    };
-  }, [q]);
-
-  const visibleSuggestions = q.trim().length >= 2 ? suggestions : [];
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (searchBoxRef.current && !searchBoxRef.current.contains(e.target as Node)) {
-        setShowSuggestions(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (!showSuggestions) {
-      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-        setShowSuggestions(true);
-      }
-      return;
-    }
-
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      const count = visibleSuggestions.length;
-      if (count > 0) {
-        setHighlightIdx((prev) => (prev + 1) % count);
-      }
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      const count = visibleSuggestions.length;
-      if (count > 0) {
-        setHighlightIdx((prev) => (prev - 1 + count) % count);
-      }
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      setShowSuggestions(false);
-      setHighlightIdx(-1);
-    }
-  };
-
-  const onSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (highlightIdx >= 0 && highlightIdx < visibleSuggestions.length) {
-      const selected = visibleSuggestions[highlightIdx];
-      saveRecentSearch(selected.name);
-      setShowSuggestions(false);
-      setQ('');
-      setHighlightIdx(-1);
-      onSelectMovie?.(selected.slug);
-      return;
-    }
-    if (q.trim()) {
-      saveRecentSearch(q.trim());
-      setShowSuggestions(false);
-      setHighlightIdx(-1);
-      onSearch(q.trim());
-      setMenuOpen(false);
-    }
-  };
   return (
     <header className="sticky top-0 z-40 w-full bg-[#090a0f]/85 backdrop-blur-xl border-b border-white/[0.08] transition-all">
       <div className="w-full max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 min-h-16 flex flex-wrap items-center justify-between gap-3 py-2 sm:h-16 sm:flex-nowrap sm:py-0 2xl:gap-6">
@@ -217,7 +124,7 @@ export const Navbar: React.FC<Props> = ({
           <NavbarLogo
             onHome={() => {
               onSelectTab('home');
-              setQ('');
+              clearQuery();
             }}
           />
 
@@ -232,7 +139,7 @@ export const Navbar: React.FC<Props> = ({
         {/* Right Search & Utility Buttons */}
         <div className="contents sm:flex sm:items-center sm:gap-2 sm:shrink-0 xl:gap-2.5">
           <div ref={searchBoxRef} className="relative order-3 w-full sm:order-none sm:w-48 md:w-64 lg:w-72 xl:w-64 2xl:w-72">
-            <form onSubmit={onSubmit} role="search">
+            <form onSubmit={handleSubmit} role="search">
               <label htmlFor="navbar-search-input" className="sr-only">
                 Tìm kiếm phim, diễn viên
               </label>
@@ -247,13 +154,9 @@ export const Navbar: React.FC<Props> = ({
                 aria-controls="navbar-search-suggestions"
                 aria-activedescendant={highlightIdx >= 0 ? `suggestion-item-${highlightIdx}` : undefined}
                 value={q}
-                onFocus={() => setShowSuggestions(true)}
+                onFocus={handleFocus}
                 onKeyDown={handleSearchKeyDown}
-                onChange={(e) => {
-                  setQ(e.target.value);
-                  setShowSuggestions(true);
-                  setHighlightIdx(-1);
-                }}
+                onChange={(e) => handleQueryChange(e.target.value)}
                 placeholder="Tìm phim, diễn viên..."
                 className="w-full h-9 bg-white/[0.06] hover:bg-white/[0.09] text-white placeholder-zinc-400 text-xs sm:text-sm rounded-full pl-8.5 pr-12 py-0 border border-white/[0.1] focus:outline-none focus:border-red-500/80 focus:ring-2 focus:ring-red-500/25 transition-all"
               />
@@ -262,12 +165,7 @@ export const Navbar: React.FC<Props> = ({
                 <button
                   type="button"
                   aria-label="Xóa từ khóa tìm kiếm"
-                  onClick={() => {
-                    setQ('');
-                    setSuggestions([]);
-                    setShowSuggestions(false);
-                    setHighlightIdx(-1);
-                  }}
+                  onClick={clearSearch}
                   className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white w-8 h-8 min-w-[32px] min-h-[32px] flex items-center justify-center rounded-full hover:bg-white/10 cursor-pointer transition-colors"
                 >
                   <X className="w-4 h-4" />
@@ -305,13 +203,8 @@ export const Navbar: React.FC<Props> = ({
                             role="option"
                             aria-selected={highlightIdx === idx}
                             type="button"
-                            onClick={() => {
-                              saveRecentSearch(formatMovieTitle(m.name));
-                              setShowSuggestions(false);
-                              setQ('');
-                              setHighlightIdx(-1);
-                              onSelectMovie?.(m.slug);
-                            }}
+                            onMouseEnter={() => setHighlightIdx(idx)}
+                            onClick={() => handleSelectSuggestion(m)}
                             className={`w-full flex items-center gap-3 p-2.5 transition-colors text-left cursor-pointer group ${
                               highlightIdx === idx ? 'bg-white/[0.14] border-l-2 border-red-500' : 'hover:bg-white/[0.08]'
                             }`}
@@ -348,11 +241,7 @@ export const Navbar: React.FC<Props> = ({
                         ))}
                         <button
                           type="button"
-                          onClick={() => {
-                            saveRecentSearch(q.trim());
-                            setShowSuggestions(false);
-                            onSearch(q.trim());
-                          }}
+                          onClick={handleSearchAll}
                           className="w-full p-2.5 text-center text-xs font-bold text-red-400 hover:text-red-300 hover:bg-red-600/10 transition-colors cursor-pointer"
                         >
                           Xem tất cả kết quả cho "{q}" →
