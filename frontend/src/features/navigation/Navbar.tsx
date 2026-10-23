@@ -18,8 +18,8 @@ import type { MovieItem } from '@/shared/types';
 import { THEME_OPTIONS, type ThemeAccent, applyTheme, getStoredTheme } from '@/shared/theme';
 import { NavbarLogo } from './NavbarLogo';
 import { DesktopNav } from './DesktopNav';
+import { useRecentSearches } from './hooks/useRecentSearches';
 
-const RECENT_SEARCHES_KEY = 'cinehub_recent_searches';
 const TRENDING_TAGS = [
   'Phim Chiếu Rạp',
   'Anime Mới',
@@ -66,38 +66,12 @@ export const Navbar: React.FC<Props> = ({
   const [showThemePicker, setShowThemePicker] = useState(false);
   const themePickerRef = useRef<HTMLDivElement>(null);
 
-  const [recentSearches, setRecentSearches] = useState<string[]>(() => {
-    try {
-      const raw = localStorage.getItem(RECENT_SEARCHES_KEY);
-      return raw ? JSON.parse(raw) : [];
-    } catch {
-      return [];
-    }
-  });
-
-  const saveRecentSearch = (term: string) => {
-    const trimmed = term.trim();
-    if (!trimmed) return;
-    const next = [
-      trimmed,
-      ...recentSearches.filter((s) => s.toLowerCase() !== trimmed.toLowerCase()),
-    ].slice(0, 5);
-    setRecentSearches(next);
-    localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(next));
-  };
-
-  const removeRecentSearch = (term: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const next = recentSearches.filter((s) => s !== term);
-    setRecentSearches(next);
-    localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(next));
-  };
-
-  const clearRecentSearches = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setRecentSearches([]);
-    localStorage.removeItem(RECENT_SEARCHES_KEY);
-  };
+  const {
+    recentSearches,
+    saveRecentSearch,
+    removeRecentSearch,
+    clearRecentSearches,
+  } = useRecentSearches();
 
   const handleSelectTag = (tag: string) => {
     setQ(tag);
