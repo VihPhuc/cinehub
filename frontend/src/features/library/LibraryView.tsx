@@ -1,8 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { Bookmark, History, Trash2, Play, Download, Upload, Search, AlertCircle, CheckCircle2, X } from 'lucide-react';
-import type { FavoriteItem, HistoryItem } from '../types';
-import { getImageUrl, formatMovieTitle } from '../services/api';
-import { exportUserData, importUserData } from '../services/storage';
+import type { FavoriteItem, HistoryItem } from '@/shared/types';
+import { getImageUrl, formatMovieTitle } from '@/shared/api';
+import { exportUserData, importUserData } from '@/shared/storage';
 
 interface Props {
   favorites: FavoriteItem[];

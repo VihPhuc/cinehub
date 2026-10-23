@@ -1,4 +1,4 @@
-import type { FavoriteItem, HistoryItem, MovieDetail, MovieItem } from '../types';
+import type { FavoriteItem, HistoryItem, MovieDetail, MovieItem } from './types';
 import {
   MAX_FAVORITES,
   MAX_HISTORY,

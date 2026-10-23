@@ -1,7 +1,7 @@
 import React from 'react';
 import { Play, Star, Bookmark } from 'lucide-react';
-import type { MovieItem } from '../types';
-import { getImageUrl, prefetchMovieDetail, formatMovieTitle } from '../services/api';
+import type { MovieItem } from '@/shared/types';
+import { getImageUrl, prefetchMovieDetail, formatMovieTitle } from '@/shared/api';
 
 interface Props {
   movie: MovieItem;

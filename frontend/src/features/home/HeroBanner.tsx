@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Play, Info, Heart, Star, ChevronLeft, ChevronRight, Video, X } from 'lucide-react';
-import type { MovieItem, MovieDetail } from '../types';
-import { getImageUrl, prefetchMovieDetail, getMovieDetail, formatMovieTitle } from '../services/api';
+import type { MovieItem, MovieDetail } from '@/shared/types';
+import { getImageUrl, prefetchMovieDetail, getMovieDetail, formatMovieTitle } from '@/shared/api';
 
 function getYouTubeId(url?: string): string | null {
   if (!url) return null;

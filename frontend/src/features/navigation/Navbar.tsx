@@ -14,10 +14,10 @@ import {
   Palette,
   Check,
 } from 'lucide-react';
-import { GENRES, COUNTRIES, NAV_TABS } from '../constants/filters';
-import { searchMovies, getImageUrl, formatMovieTitle } from '../services/api';
-import type { MovieItem } from '../types';
-import { THEME_OPTIONS, type ThemeAccent, applyTheme, getStoredTheme } from '../lib/theme';
+import { GENRES, COUNTRIES, NAV_TABS } from './constants';
+import { searchMovies, getImageUrl, formatMovieTitle } from '@/shared/api';
+import type { MovieItem } from '@/shared/types';
+import { THEME_OPTIONS, type ThemeAccent, applyTheme, getStoredTheme } from '@/shared/theme';
 
 const RECENT_SEARCHES_KEY = 'cinehub_recent_searches';
 const TRENDING_TAGS = [

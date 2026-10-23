@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
 import DOMPurify from 'dompurify';
 import { X, Play, Bookmark, Star, Calendar, Clock, Loader2, Share2, Check, Video, Users, User, AlertCircle, RefreshCw, QrCode, Smartphone } from 'lucide-react';
-import type { MovieDetail, MovieItem } from '../types';
-import { getImageUrl, getMovieDetail, getGenreMovies, formatMovieTitle } from '../services/api';
+import type { MovieDetail, MovieItem } from '@/shared/types';
+import { getImageUrl, getMovieDetail, getGenreMovies, formatMovieTitle } from '@/shared/api';
 
 function getYouTubeEmbedUrl(url?: string): string | null {
   if (!url) return null;

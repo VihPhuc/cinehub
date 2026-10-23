@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import type { MovieItem } from '../types';
+import type { MovieItem } from '@/shared/types';
 import { MovieCard } from './MovieCard';
 import {
   ChevronLeft,

@@ -6,7 +6,7 @@ import type {
   MovieDetailResponse,
   MovieItem,
   NewUpdatedResponse,
-} from '../types';
+} from './types';
 import { safeStreamUrl } from './validation';
 import { buildTmdbEmbedUrl } from './tmdb';
 

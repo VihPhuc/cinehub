@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { ChevronLeft, ChevronRight, ChevronRight as ArrowRight } from 'lucide-react';
-import type { MovieItem } from '../types';
+import type { MovieItem } from '@/shared/types';
 import { MovieCard } from './MovieCard';
 
 interface Props {

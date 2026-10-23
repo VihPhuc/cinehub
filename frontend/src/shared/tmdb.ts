@@ -1,4 +1,4 @@
-import type { MovieTMDB } from '../types';
+import type { MovieTMDB } from './types';
 
 const VIDSRC_EMBED_BASE = 'https://vidsrc.to/embed';
 

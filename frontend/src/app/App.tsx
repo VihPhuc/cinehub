@@ -12,22 +12,22 @@ import {
   getMovieDetail,
   searchMovies,
   getImageUrl,
-} from './services/api';
-import type { MovieDetail, MovieItem, FavoriteItem, HistoryItem } from './types';
-import { getFavorites, getHistory, toggleFavorite, clearHistory, removeHistoryItem, subscribeToStorage } from './services/storage';
-import { buildUrlSearch, parseUrlState } from './lib/urlState';
+} from '@/shared/api';
+import type { MovieDetail, MovieItem, FavoriteItem, HistoryItem } from '@/shared/types';
+import { getFavorites, getHistory, toggleFavorite, clearHistory, removeHistoryItem, subscribeToStorage } from '@/shared/storage';
+import { buildUrlSearch, parseUrlState } from './urlState';
 import { ArrowUp, WifiOff, Play, Clock, ChevronRight, Trophy, Sparkles, Flame, Zap, Clapperboard, Tv } from 'lucide-react';
-import { THEME_OPTIONS } from './lib/theme';
-import { Navbar } from './components/Navbar';
-import { HeroBanner } from './components/HeroBanner';
-import { MovieRow } from './components/MovieRow';
-import { MovieGrid } from './components/MovieGrid';
-import { MovieDetailModal } from './components/MovieDetailModal';
-import { LibraryView } from './components/LibraryView';
+import { THEME_OPTIONS } from '@/shared/theme';
+import { Navbar } from '@/features/navigation/Navbar';
+import { HeroBanner } from '@/features/home/HeroBanner';
+import { MovieRow } from '@/features/catalog/MovieRow';
+import { MovieGrid } from '@/features/catalog/MovieGrid';
+import { MovieDetailModal } from '@/features/detail/MovieDetailModal';
+import { LibraryView } from '@/features/library/LibraryView';
 
 // Keep hls.js out of the initial bundle: it is only needed once a movie plays.
 const VideoPlayer = lazy(() =>
-  import('./components/VideoPlayer').then((module) => ({ default: module.VideoPlayer }))
+  import('@/features/player/VideoPlayer').then((module) => ({ default: module.VideoPlayer }))
 );
 
 function PlayerFallback() {

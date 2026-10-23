@@ -17,10 +17,10 @@ import {
   Sparkles,
   RectangleHorizontal,
 } from 'lucide-react';
-import type { MovieDetail } from '../types';
-import { saveHistory, getHistory } from '../services/storage';
-import { decideHlsRecovery } from '../lib/hlsRecovery';
-import { formatMovieTitle, getImageUrl } from '../services/api';
+import type { MovieDetail } from '@/shared/types';
+import { saveHistory, getHistory } from '@/shared/storage';
+import { decideHlsRecovery } from './hlsRecovery';
+import { formatMovieTitle, getImageUrl } from '@/shared/api';
 
 // Bounded retry budget for fatal HLS errors (network/media). Prevents an
 // infinite restart loop when the source is permanently unavailable.

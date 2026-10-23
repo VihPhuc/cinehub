@@ -1,4 +1,4 @@
-import type { FavoriteItem, HistoryItem } from '../types';
+import type { FavoriteItem, HistoryItem } from './types';
 
 export const MAX_FAVORITES = 100;
 export const MAX_HISTORY = 50;
