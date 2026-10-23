@@ -5,6 +5,7 @@ import { CompatModule } from './compat/compat.module';
 import configuration from './common/config/configuration';
 import { envValidationSchema } from './common/config/env.validation';
 import { HealthModule } from './health/health.module';
+import { MoviesModule } from './movies/movies.module';
 import { UpstreamModule } from './upstream/upstream.module';
 
 @Module({
@@ -18,6 +19,7 @@ import { UpstreamModule } from './upstream/upstream.module';
     CacheModule,
     UpstreamModule,
     CompatModule,
+    MoviesModule,
     HealthModule,
   ],
 })
