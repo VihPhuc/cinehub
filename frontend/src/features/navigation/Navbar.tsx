@@ -1,9 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  Film,
   Search,
   Bookmark,
-  ChevronDown,
   Menu,
   X,
   Loader2,
@@ -18,6 +16,8 @@ import { GENRES, COUNTRIES, NAV_TABS } from './constants';
 import { searchMovies, getImageUrl, formatMovieTitle } from '@/shared/api';
 import type { MovieItem } from '@/shared/types';
 import { THEME_OPTIONS, type ThemeAccent, applyTheme, getStoredTheme } from '@/shared/theme';
+import { NavbarLogo } from './NavbarLogo';
+import { DesktopNav } from './DesktopNav';
 
 const RECENT_SEARCHES_KEY = 'cinehub_recent_searches';
 const TRENDING_TAGS = [
@@ -56,7 +56,6 @@ export const Navbar: React.FC<Props> = ({
 }) => {
   const [q, setQ] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
-  const [openDropdown, setOpenDropdown] = useState<'genre' | 'country' | null>(null);
   const [suggestions, setSuggestions] = useState<MovieItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -241,140 +240,19 @@ export const Navbar: React.FC<Props> = ({
       <div className="w-full max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 min-h-16 flex flex-wrap items-center justify-between gap-3 py-2 sm:h-16 sm:flex-nowrap sm:py-0 2xl:gap-6">
         {/* Left Section: Logo & Desktop Navigation */}
         <div className="flex items-center gap-3 2xl:gap-8 min-w-0">
-          {/* Logo */}
-          <button
-            onClick={() => {
+          <NavbarLogo
+            onHome={() => {
               onSelectTab('home');
               setQ('');
             }}
-            className="group flex items-center gap-2.5 cursor-pointer text-left focus:outline-none shrink-0"
-          >
-            <div className="relative w-9 h-9 rounded-xl bg-gradient-to-tr from-red-600 via-rose-600 to-amber-500 flex items-center justify-center shadow-lg shadow-red-600/30 group-hover:shadow-red-600/50 group-hover:scale-105 transition-all shrink-0">
-              <Film className="w-5 h-5 text-white" />
-              <div className="absolute inset-0 rounded-xl bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
-            </div>
-            <div className="flex items-center gap-1.5 whitespace-nowrap">
-              <span className="text-xl font-black tracking-tight font-heading text-white">
-                CINE<span className="bg-gradient-to-r from-red-500 via-rose-500 to-amber-400 bg-clip-text text-transparent">HUB</span>
-              </span>
-              <span className="hidden sm:inline-block px-1.5 py-0.5 rounded text-[11px] font-black uppercase tracking-wider bg-red-600/20 text-red-400 border border-red-500/30">
-                HD
-              </span>
-            </div>
-          </button>
+          />
 
-          {/* Desktop Nav Items */}
-          <nav className="hidden xl:flex items-center gap-1 2xl:gap-1.5 shrink-0">
-            {NAV_TABS.filter((t) => !['genres', 'countries', 'library'].includes(t.id)).map((t) => {
-              const isActive = activeTab === t.id;
-              return (
-                <button
-                  key={t.id}
-                  onClick={() => onSelectTab(t.id)}
-                  className={`relative h-9 px-2.5 2xl:px-3 text-xs 2xl:text-sm whitespace-nowrap shrink-0 transition-colors duration-200 cursor-pointer inline-flex items-center justify-center rounded-lg ${
-                    isActive
-                      ? 'text-white font-bold after:absolute after:bottom-0 after:left-2 after:right-2 after:h-0.5 after:bg-gradient-to-r after:from-red-500 after:via-rose-500 after:to-amber-500 after:rounded-full after:shadow-[0_0_10px_rgba(239,68,68,0.9)]'
-                      : 'text-zinc-400 hover:text-white font-medium hover:bg-white/[0.05]'
-                  }`}
-                >
-                  {t.id === 'hoat-hinh' ? (
-                    <span>
-                      Anime<span className="hidden 2xl:inline"> / Hoạt Hình</span>
-                    </span>
-                  ) : (
-                    <span>{t.label}</span>
-                  )}
-                </button>
-              );
-            })}
-
-            {/* Genre Dropdown */}
-            <div className="relative shrink-0" onMouseLeave={() => setOpenDropdown(null)}>
-              <button
-                onClick={() => setOpenDropdown(openDropdown === 'genre' ? null : 'genre')}
-                className={`h-9 px-2.5 2xl:px-3 text-xs 2xl:text-sm whitespace-nowrap shrink-0 inline-flex items-center gap-1 transition-colors cursor-pointer rounded-lg ${
-                  activeTab === 'genre'
-                    ? 'text-white font-bold relative after:absolute after:bottom-0 after:left-2 after:right-2 after:h-0.5 after:bg-gradient-to-r after:from-red-500 after:via-rose-500 after:to-amber-500 after:rounded-full after:shadow-[0_0_10px_rgba(239,68,68,0.9)]'
-                    : 'text-zinc-400 hover:text-white font-medium hover:bg-white/[0.05]'
-                }`}
-              >
-                <span>Thể Loại</span>
-                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 shrink-0 ${openDropdown === 'genre' ? 'rotate-180' : ''}`} />
-              </button>
-              {openDropdown === 'genre' && (
-                <div className="absolute top-full left-0 pt-2 w-80 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
-                  <div className="glass-dropdown rounded-2xl p-2.5 grid grid-cols-2 gap-1">
-                    <div className="col-span-2 px-2 py-1 text-[11px] font-bold text-zinc-400 uppercase tracking-wider border-b border-white/[0.08] mb-1">
-                      Khám phá thể loại
-                    </div>
-                    {GENRES.map((g) => (
-                      <button
-                        key={g.slug}
-                        onClick={() => {
-                          onSelectGenre(g.slug, g.name);
-                          setOpenDropdown(null);
-                        }}
-                        className="flex items-center gap-2 text-left text-xs px-2.5 py-2 rounded-lg hover:bg-red-600/20 hover:text-red-300 text-zinc-300 transition-colors cursor-pointer group"
-                      >
-                        <span className="w-1.5 h-1.5 rounded-full bg-zinc-600 group-hover:bg-red-500 transition-colors shrink-0" />
-                        <span className="truncate">{g.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Country Dropdown */}
-            <div className="relative shrink-0" onMouseLeave={() => setOpenDropdown(null)}>
-              <button
-                onClick={() => setOpenDropdown(openDropdown === 'country' ? null : 'country')}
-                className={`h-9 px-2.5 2xl:px-3 text-xs 2xl:text-sm whitespace-nowrap shrink-0 inline-flex items-center gap-1 transition-colors cursor-pointer rounded-lg ${
-                  activeTab === 'country'
-                    ? 'text-white font-bold relative after:absolute after:bottom-0 after:left-2 after:right-2 after:h-0.5 after:bg-gradient-to-r after:from-red-500 after:via-rose-500 after:to-amber-500 after:rounded-full after:shadow-[0_0_10px_rgba(239,68,68,0.9)]'
-                    : 'text-zinc-400 hover:text-white font-medium hover:bg-white/[0.05]'
-                }`}
-              >
-                <span>Quốc Gia</span>
-                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 shrink-0 ${openDropdown === 'country' ? 'rotate-180' : ''}`} />
-              </button>
-              {openDropdown === 'country' && (
-                <div className="absolute top-full left-0 pt-2 w-64 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
-                  <div className="glass-dropdown rounded-2xl p-2.5 grid grid-cols-2 gap-1">
-                    <div className="col-span-2 px-2 py-1 text-[11px] font-bold text-zinc-400 uppercase tracking-wider border-b border-white/[0.08] mb-1">
-                      Chọn quốc gia
-                    </div>
-                    {COUNTRIES.map((c) => (
-                      <button
-                        key={c.slug}
-                        onClick={() => {
-                          onSelectCountry(c.slug, c.name);
-                          setOpenDropdown(null);
-                        }}
-                        className="flex items-center gap-2 text-left text-xs px-2.5 py-2 rounded-lg hover:bg-red-600/20 hover:text-red-300 text-zinc-300 transition-colors cursor-pointer group"
-                      >
-                        <span className="w-1.5 h-1.5 rounded-full bg-zinc-600 group-hover:bg-red-500 transition-colors shrink-0" />
-                        <span className="truncate">{c.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Library Link (Tủ Phim) */}
-            <button
-              onClick={() => onSelectTab('library')}
-              className={`h-9 px-2.5 2xl:px-3 text-xs 2xl:text-sm whitespace-nowrap shrink-0 inline-flex items-center gap-1.5 rounded-lg transition-colors cursor-pointer ${
-                activeTab === 'library'
-                  ? 'text-white font-bold relative after:absolute after:bottom-0 after:left-2 after:right-2 after:h-0.5 after:bg-gradient-to-r after:from-red-500 after:via-rose-500 after:to-amber-500 after:rounded-full after:shadow-[0_0_10px_rgba(239,68,68,0.9)]'
-                  : 'text-zinc-400 hover:text-white font-medium hover:bg-white/[0.05]'
-              }`}
-            >
-              <Bookmark className="w-3.5 h-3.5 shrink-0" />
-              <span>Tủ Phim</span>
-            </button>
-          </nav>
+          <DesktopNav
+            activeTab={activeTab}
+            onSelectTab={onSelectTab}
+            onSelectGenre={onSelectGenre}
+            onSelectCountry={onSelectCountry}
+          />
         </div>
 
         {/* Right Search & Utility Buttons */}
