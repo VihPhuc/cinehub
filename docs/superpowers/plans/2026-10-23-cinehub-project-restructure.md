@@ -452,11 +452,10 @@ export default defineConfig({
 
 - [ ] **Step 7: Add the TypeScript path alias.**
 
-In `frontend/tsconfig.app.json`, add these two compiler options inside `compilerOptions`:
+In `frontend/tsconfig.app.json`, add only the `paths` mapping inside `compilerOptions`. TypeScript 6 rejects `baseUrl`, so do not add it:
 ```json
-"baseUrl": ".",
 "paths": {
-  "@/*": ["src/*"]
+  "@/*": ["./src/*"]
 },
 ```
 Keep `"include": ["src"]` and `"exclude": ["src/**/*.test.ts"]` unchanged.

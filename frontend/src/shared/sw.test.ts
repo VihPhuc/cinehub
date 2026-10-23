@@ -30,7 +30,7 @@ function createHarness(cachedResponse?: Response) {
       deletedCaches.push(name);
       return true;
     }),
-    keys: vi.fn(async () => ['cinehub-shell-v4', 'cinehub-api-v2', 'other-cache']),
+    keys: vi.fn(async () => ['cinehub-shell-v5', 'cinehub-api-v2', 'other-cache']),
     match: vi.fn(async () => undefined),
     open: vi.fn(async () => cache),
   };

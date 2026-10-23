@@ -1,16 +1,19 @@
 # Coordination — CineHub
 
-Cập nhật: 2026-10-20 20:32 (sau khi hợp nhất 3 luồng)
+Cập nhật: 2026-10-23 (sau refactor frontend/backend)
+
+> Repo đã tách thành `frontend/` và `backend/`. Backend hiện chỉ có endpoint
+> `/api/health`; các module compat/catalog/search/detail chưa được implement.
 
 ## Trạng thái các luồng
 
 | Luồng | File chính | Trạng thái |
 |-------|------------|------------|
-| Data / TDD | `src/services/api.ts`, `storage.ts`, `validation.ts`, `tmdb.ts`, `*.test.ts`, `src/lib/urlState.ts`, `vitest.config.ts`, `package.json` | Hoàn tất, 40 test pass; cache hết hạn không trả khi online, có clear API cache |
-| App / URL & race | `src/App.tsx` | Hoàn tất: hydrate URL, skip ghi URL lần đầu, popstate, request-id + AbortController cho catalog, reset page khi đổi filter, chặn URL-sync khi đang khôi phục watch, lazy-load player |
-| Player | `src/components/VideoPlayer.tsx` | Hoàn tất phần P1: retry có giới hạn, HLS lifecycle, throttle history, keyboard guard, sync tập khi back/forward, `resumeFromHistory`, không echo `onEpChange` gây vòng lặp |
-| UI / a11y | `MovieDetailModal.tsx`, `MovieCard.tsx`, `Navbar.tsx`, `MovieGrid.tsx`, `HeroBanner.tsx`, `MovieRow.tsx`, `LibraryView.tsx`, `index.css` | Hoàn tất trong tree: DOMPurify + dialog semantics, keyboard card, combobox search |
-| PWA / security | `public/sw.js`, `src/main.tsx`, `index.html`, `public/manifest.json`, `public/icon-*.png`, `vite.config.ts` | Hoàn tất: cache có version + giới hạn, navigation fallback, SW chỉ ở PROD, CSP build-only, icon PWA, dọn asset thừa |
+| Data / TDD | `frontend/src/shared/api.ts`, `storage.ts`, `validation.ts`, `tmdb.ts`, `*.test.ts`, `frontend/src/app/urlState.ts`, `frontend/vitest.config.ts`, `frontend/package.json` | Hoàn tất, 61 test frontend pass; cache hết hạn không trả khi online, có clear API cache |
+| App / URL & race | `frontend/src/app/App.tsx` | Hoàn tất: hydrate URL, skip ghi URL lần đầu, popstate, request-id + AbortController cho catalog, reset page khi đổi filter, chặn URL-sync khi đang khôi phục watch, lazy-load player |
+| Player | `frontend/src/features/player/VideoPlayer.tsx` | Hoàn tất phần P1: retry có giới hạn, HLS lifecycle, throttle history, keyboard guard, sync tập khi back/forward, `resumeFromHistory`, không echo `onEpChange` gây vòng lặp |
+| UI / a11y | `frontend/src/features/detail/MovieDetailModal.tsx`, `frontend/src/features/catalog/MovieCard.tsx`, `frontend/src/features/navigation/Navbar.tsx`, `frontend/src/features/catalog/MovieGrid.tsx`, `frontend/src/features/home/HeroBanner.tsx`, `frontend/src/features/catalog/MovieRow.tsx`, `frontend/src/features/library/LibraryView.tsx`, `frontend/src/app/index.css` | Hoàn tất trong tree: DOMPurify + dialog semantics, keyboard card, combobox search |
+| PWA / security | `frontend/public/sw.js`, `frontend/src/app/main.tsx`, `frontend/index.html`, `frontend/public/manifest.json`, `frontend/public/icon-*.png`, `frontend/vite.config.ts` | Hoàn tất: cache có version + giới hạn, navigation fallback, SW chỉ ở PROD, CSP build-only, icon PWA, dọn asset thừa |
 
 ## Đã sửa (P1)
 
@@ -80,13 +83,15 @@ Cập nhật: 2026-10-20 20:32 (sau khi hợp nhất 3 luồng)
 Chạy tại `D:\Phim`:
 
 ```text
-npm test                -> 8 test files, 45 tests passed
-npm run lint            -> clean (0 warnings, 0 errors trên 34 files)
-npm run build           -> pass (tsc -b + vite build, ~670ms)
+npm run test:web        -> 8 test files, 61 tests passed
+npm run test:api        -> 27 unit + 2 e2e passed
+npm run lint            -> clean (frontend + backend)
+npm run build:web       -> pass (tsc -b + vite build)
+npm run build:api       -> pass (nest build)
 npm run check:bundle    -> pass (hls.js không bị preload, deferred)
 npm run check:deploy    -> pass (_headers + _redirects đã sinh)
 npm run check:mojibake  -> OK: no mojibake
-node scripts/audit-check.mjs -> All OK (backend 10/10 OK, UI đầy đủ chỉ số)
+node scripts/audit-check.mjs -> All OK (backend 11/11 OK)
 ```
 
 Kiểm tra thủ công bằng Chrome headless + CDP trên `vite preview`:
@@ -96,7 +101,7 @@ Kiểm tra thủ công bằng Chrome headless + CDP trên `vite preview`:
 - Chọn `Tập 02`: URL thành `?watch=...&ep=1`, UI active Tập 02.
 - `history.back()`: URL về `?watch=...&ep=0`, UI active Tập 01; `history.forward()` quay lại Tập 02.
 - History chỉ tăng 1 entry cho mỗi lần đổi tập (không còn vòng lặp pushState; trước fix là 50+ entry).
-- Service worker: `activated`, scope `/`, cache `cinehub-shell-v4`, `cinehub-api-v3`, `cinehub-images-v1`; shell cache có đủ `/`, `index.html`, manifest, favicon và 4 icon; trang do SW kiểm soát.
+- Service worker: `activated`, scope `/`, cache `cinehub-shell-v5`, `cinehub-api-v3`, `cinehub-images-v1`; shell cache có đủ `/`, `index.html`, manifest, favicon và 4 icon; trang do SW kiểm soát.
 - API cache v3 tạo được entry sau khi SW kiểm soát trang; gửi `CLEAR_API_CACHE` xóa sạch cache API (`caches.has(...) === false`).
 - Unit test xác nhận cache API quá 4 phút bị refetch, cache còn hạn trả ngay, và message clear xóa đúng cache.
 - Không có response same-origin 4xx/5xx, không có console error/CSP violation; manifest + toàn bộ icon trả 200.
@@ -112,11 +117,11 @@ Kiểm tra thủ công bằng Chrome headless + CDP trên `vite preview`:
 - **Phối hợp Frontend ↔ Backend (Cập nhật 2026-10-21 22:52):**
   - **Spec & Plan backend từ `opencode`:** Đã đồng bộ theo bản thiết kế [2026-10-21-cinehub-backend-design.md](file:///d:/Phim/docs/superpowers/specs/2026-10-21-cinehub-backend-design.md) và kế hoạch chi tiết [2026-10-21-cinehub-backend.md](file:///d:/Phim/docs/superpowers/plans/2026-10-21-cinehub-backend.md) (NestJS proxy trên port 3001, cache in-memory TTL/LRU, single-flight, hybrid compat `/api/compat` + normalized `/api/v1`).
   - **Phía Frontend (`anty`):**
-    - Đã cập nhật [src/services/api.ts](file:///d:/Phim/src/services/api.ts) hỗ trợ biến môi trường `VITE_API_BASE_URL` linh hoạt (mặc định fallback về `https://phimapi.com` khi backend chưa bật, hoặc trỏ tới `http://localhost:3001/api/compat` khi backend chạy).
+    - Đã cập nhật [frontend/src/shared/api.ts](file:///d:/Phim/frontend/src/shared/api.ts) hỗ trợ biến môi trường `VITE_API_BASE_URL` linh hoạt (mặc định fallback về `https://phimapi.com` khi backend chưa bật, hoặc trỏ tới `http://localhost:3001/api/compat` khi backend chạy).
     - Đã tạo [.env.example](file:///d:/Phim/.env.example) hướng dẫn kết nối backend 1 dòng.
-    - Đã cập nhật `connect-src` trong [vite.config.ts](file:///d:/Phim/vite.config.ts) CSP cho phép `http://localhost:3001` và `http://127.0.0.1:3001`.
-    - Đã cập nhật [public/sw.js](file:///d:/Phim/public/sw.js) nhận diện các route `/api/compat` và `/api/v1` vào cache API `cinehub-api-v3`.
-    - Đã bổ sung bộ unit test trong [src/services/sw.test.ts](file:///d:/Phim/src/services/sw.test.ts) kiểm chứng luồng định tuyến cache của `/api/compat` và `/api/v1`. Toàn bộ 47/47 tests pass 100%.
-    - Frontend sẵn sàng kết nối và kiểm chứng ngay khi opencode khởi chạy backend trên port 3001!
+    - Đã cập nhật `connect-src` trong [frontend/vite.config.ts](file:///d:/Phim/frontend/vite.config.ts) CSP cho phép `http://localhost:3001` và `http://127.0.0.1:3001`.
+    - Đã cập nhật [frontend/public/sw.js](file:///d:/Phim/frontend/public/sw.js) nhận diện các route `/api/compat` và `/api/v1` vào cache API `cinehub-api-v3`.
+    - Đã bổ sung bộ unit test trong [frontend/src/shared/sw.test.ts](file:///d:/Phim/frontend/src/shared/sw.test.ts) kiểm chứng luồng định tuyến cache của `/api/compat` và `/api/v1`. Toàn bộ 61/61 test frontend pass 100%.
+    - Frontend đã sẵn sàng cấu hình `VITE_API_BASE_URL`; backend hiện chỉ có `/api/health`, chưa implement các module compat/catalog/search/detail.
 
 

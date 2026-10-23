@@ -1,6 +1,6 @@
 // CineHub service worker: app shell + API + image runtime caching.
 // Keep cache versions in sync with releases; old caches are removed on activate.
-const SHELL_CACHE = 'cinehub-shell-v4';
+const SHELL_CACHE = 'cinehub-shell-v5';
 const API_CACHE = 'cinehub-api-v3';
 const IMAGE_CACHE = 'cinehub-images-v1';
 const API_TTL_MS = 4 * 60 * 1000;

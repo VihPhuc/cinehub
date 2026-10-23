@@ -1,14 +1,14 @@
 import fs from 'node:fs';
 
 const files = [
-  'src/App.tsx',
-  'src/components/MovieDetailModal.tsx',
-  'src/components/VideoPlayer.tsx',
-  'src/components/HeroBanner.tsx',
-  'src/components/Navbar.tsx',
-  'src/components/MovieGrid.tsx',
-  'src/components/LibraryView.tsx',
-  'src/components/MovieCard.tsx',
+  'frontend/src/app/App.tsx',
+  'frontend/src/features/detail/MovieDetailModal.tsx',
+  'frontend/src/features/player/VideoPlayer.tsx',
+  'frontend/src/features/home/HeroBanner.tsx',
+  'frontend/src/features/navigation/Navbar.tsx',
+  'frontend/src/features/catalog/MovieGrid.tsx',
+  'frontend/src/features/library/LibraryView.tsx',
+  'frontend/src/features/catalog/MovieCard.tsx',
 ];
 
 const pats = {
@@ -33,17 +33,17 @@ for (const f of files) {
 
 // Backend / infra checks
 const backend = {
-  A2_race: ['src/App.tsx', /AbortController|requestKey|loadedKey/],
-  B1_dedup: ['src/services/api.ts', /inFlightRequests/],
-  B2_tmdbSeason: ['src/services/tmdb.ts', /season/],
-  B3_importValidate: ['src/services/storage.ts', /sanitize|validate/],
-  B4_eviction: ['src/services/api.ts', /MAX_MEMORY|trimMemory|evict/],
-  B4_swExpiry: ['public/sw.js', /expiry|MAX_AGE|Date\.now/],
-  C2_epUrl: ['src/App.tsx', /onEpChange|watchEpIdx/],
-  C3_throttle: ['src/components/VideoPlayer.tsx', /lastSavedAt/],
-  C8_native: ['src/components/VideoPlayer.tsx', /canPlayType/],
-  E1_sanitize: ['src/components/MovieDetailModal.tsx', /DOMPurify|sanitizedContent/],
-  CSP: ['vite.config.ts', /Content-Security-Policy/],
+  A2_race: ['frontend/src/app/App.tsx', /AbortController|requestKey|loadedKey/],
+  B1_dedup: ['frontend/src/shared/api.ts', /inFlightRequests/],
+  B2_tmdbSeason: ['frontend/src/shared/tmdb.ts', /season/],
+  B3_importValidate: ['frontend/src/shared/storage.ts', /sanitize|validate/],
+  B4_eviction: ['frontend/src/shared/api.ts', /MAX_MEMORY|trimMemory|evict/],
+  B4_swExpiry: ['frontend/public/sw.js', /expiry|MAX_AGE|Date\.now/],
+  C2_epUrl: ['frontend/src/app/App.tsx', /onEpChange|watchEpIdx/],
+  C3_throttle: ['frontend/src/features/player/VideoPlayer.tsx', /lastSavedAt/],
+  C8_native: ['frontend/src/features/player/VideoPlayer.tsx', /canPlayType/],
+  E1_sanitize: ['frontend/src/features/detail/MovieDetailModal.tsx', /DOMPurify|sanitizedContent/],
+  CSP: ['frontend/vite.config.ts', /Content-Security-Policy/],
 };
 console.log('--- backend ---');
 for (const [k, [f, re]] of Object.entries(backend)) {
