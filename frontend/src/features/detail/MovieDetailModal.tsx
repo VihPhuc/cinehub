@@ -3,6 +3,7 @@ import DOMPurify from 'dompurify';
 import { X, Play, Bookmark, Star, Calendar, Clock, Loader2, Share2, Check, Video, Users, User, AlertCircle, RefreshCw, QrCode, Smartphone } from 'lucide-react';
 import type { MovieDetail, MovieItem } from '@/shared/types';
 import { getImageUrl, getMovieDetail, getGenreMovies, formatMovieTitle } from '@/shared/api';
+import { isEpisodeCompleted } from '@/shared/storage';
 
 function getYouTubeEmbedUrl(url?: string): string | null {
   if (!url) return null;
@@ -514,15 +515,29 @@ export const MovieDetailModal: React.FC<Props> = ({
                 )}
               </div>
               <div className="flex flex-wrap gap-2 max-h-44 overflow-y-auto p-1.5 bg-black/40 rounded-2xl border border-white/[0.06]">
-                {movie.episodes[selectedServerIdx]?.server_data?.map((ep, idx) => (
-                  <button
-                    key={ep.slug}
-                    onClick={() => onWatch(movie, selectedServerIdx, idx)}
-                    className="px-3.5 py-2 rounded-xl glass-pill hover:bg-gradient-to-r hover:from-red-600 hover:to-rose-600 hover:text-white text-xs font-bold text-zinc-300 transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-red-500"
-                  >
-                    {ep.name}
-                  </button>
-                ))}
+                {movie.episodes[selectedServerIdx]?.server_data?.map((ep, idx) => {
+                  const completed = isEpisodeCompleted(movie.slug, ep.slug);
+                  return (
+                    <button
+                      key={ep.slug}
+                      onClick={() => onWatch(movie, selectedServerIdx, idx)}
+                      aria-label={`Tập ${ep.name}${completed ? ' (Đã xem)' : ''}`}
+                      title={`Tập ${ep.name}${completed ? ' - Đã xem xong' : ''}`}
+                      className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-red-500 ${
+                        completed
+                          ? 'bg-emerald-950/20 hover:bg-emerald-950/40 border border-emerald-500/35 text-emerald-300 hover:text-white shadow-sm shadow-emerald-900/20'
+                          : 'glass-pill hover:bg-gradient-to-r hover:from-red-600 hover:to-rose-600 hover:text-white text-zinc-300'
+                      }`}
+                    >
+                      <span>{ep.name}</span>
+                      {completed && (
+                        <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-emerald-500/20 text-emerald-400 shrink-0">
+                          <Check className="w-2.5 h-2.5 stroke-[3]" />
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}

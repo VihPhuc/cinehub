@@ -10,6 +10,7 @@ function jsonResponse(body: unknown): Response {
 beforeEach(() => {
   vi.resetModules();
   sessionStorage.clear();
+  vi.stubEnv('VITE_API_BASE_URL', '');
 });
 
 afterEach(() => {
@@ -445,4 +446,102 @@ describe('api error resiliency and safe fallbacks', () => {
     expect(sessionStorage.length).toBe(0);
   });
 });
+
+describe('api normalized v1 endpoints', () => {
+  const v1Base = 'http://localhost:3001/api/v1';
+
+  it('detects isV1Api correctly', async () => {
+    vi.stubEnv('VITE_API_BASE_URL', v1Base);
+    const { isV1Api } = await import('./api');
+    expect(isV1Api()).toBe(true);
+  });
+
+  it('dispatches getNewUpdatedMovies to /movies/new', async () => {
+    vi.stubEnv('VITE_API_BASE_URL', v1Base);
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({
+        items: [{ slug: 'norm-new', name: 'Phim Mới Chuẩn' }],
+        pagination: { page: 1, totalPages: 4 },
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { getNewUpdatedMovies } = await import('./api');
+    const res = await getNewUpdatedMovies(1);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://localhost:3001/api/v1/movies/new?page=1',
+      expect.any(Object)
+    );
+    expect(res.items[0].slug).toBe('norm-new');
+    expect(res.totalPages).toBe(4);
+  });
+
+  it('dispatches getCatalogMovies to /movies?type=:type', async () => {
+    vi.stubEnv('VITE_API_BASE_URL', v1Base);
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({
+        title: 'Phim Lẻ Chuẩn',
+        items: [{ slug: 'norm-cat', name: 'Phim Lẻ' }],
+        pagination: { page: 2, totalPages: 10 },
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { getCatalogMovies } = await import('./api');
+    const res = await getCatalogMovies('phim-le', 2);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://localhost:3001/api/v1/movies?type=phim-le&page=2',
+      expect.any(Object)
+    );
+    expect(res.title).toBe('Phim Lẻ Chuẩn');
+    expect(res.items[0].slug).toBe('norm-cat');
+  });
+
+  it('dispatches searchMovies to /search?q=:q', async () => {
+    vi.stubEnv('VITE_API_BASE_URL', v1Base);
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({
+        items: [{ slug: 'avatar', name: 'Avatar' }],
+        pagination: { page: 1, totalPages: 1 },
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { searchMovies } = await import('./api');
+    const res = await searchMovies('avatar', 1);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://localhost:3001/api/v1/search?q=avatar&page=1',
+      expect.any(Object)
+    );
+    expect(res.items[0].slug).toBe('avatar');
+  });
+
+  it('dispatches getMovieDetail to /movies/:slug', async () => {
+    vi.stubEnv('VITE_API_BASE_URL', v1Base);
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({
+        movie: {
+          slug: 'avatar-2',
+          name: 'Avatar 2',
+          type: 'single',
+          episodes: [],
+        },
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { getMovieDetail } = await import('./api');
+    const detail = await getMovieDetail('avatar-2');
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://localhost:3001/api/v1/movies/avatar-2',
+      expect.any(Object)
+    );
+    expect(detail?.slug).toBe('avatar-2');
+  });
+});
+
 

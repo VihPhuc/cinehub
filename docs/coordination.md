@@ -1,16 +1,16 @@
 # Coordination — CineHub
 
-Cập nhật: 2026-10-23 (sau refactor frontend/backend)
+Cập nhật: 2026-10-24 (sau refactor frontend/backend và hoàn thành Backend Phase 1)
 
-> Repo đã tách thành `frontend/` và `backend/`. Backend đã có compat
-> (`/api/compat/*`) và normalized (`/api/v1/*`), CORS/rate limit/Swagger; xem
-> `docs/backend-api.md` để tích hợp.
+> Repo đã tách thành `frontend/` và `backend/`. Backend đã hoàn tất Phase 1
+> (compat `/api/compat/*` và normalized `/api/v1/*`, CORS/rate limit/Swagger); xem
+> [docs/backend-api.md](backend-api.md) để tích hợp.
 
 ## Trạng thái các luồng
 
 | Luồng | File chính | Trạng thái |
 |-------|------------|------------|
-| Data / TDD | `frontend/src/shared/api.ts`, `storage.ts`, `validation.ts`, `tmdb.ts`, `*.test.ts`, `frontend/src/app/urlState.ts`, `frontend/vitest.config.ts`, `frontend/package.json` | Hoàn tất, 61 test frontend pass; cache hết hạn không trả khi online, có clear API cache |
+| Data / TDD | `frontend/src/shared/api.ts`, `storage.ts`, `validation.ts`, `tmdb.ts`, `*.test.ts`, `frontend/src/app/urlState.ts`, `frontend/vitest.config.ts`, `frontend/package.json` | Hoàn tất, 67 test frontend pass; cache hết hạn không trả khi online, có clear API cache, kết nối live với backend normalized `/api/v1` |
 | App / URL & race | `frontend/src/app/App.tsx` | Hoàn tất: hydrate URL, skip ghi URL lần đầu, popstate, request-id + AbortController cho catalog, reset page khi đổi filter, chặn URL-sync khi đang khôi phục watch, lazy-load player |
 | Player | `frontend/src/features/player/VideoPlayer.tsx` | Hoàn tất phần P1: retry có giới hạn, HLS lifecycle, throttle history, keyboard guard, sync tập khi back/forward, `resumeFromHistory`, không echo `onEpChange` gây vòng lặp |
 | UI / a11y | `frontend/src/features/detail/MovieDetailModal.tsx`, `frontend/src/features/catalog/MovieCard.tsx`, `frontend/src/features/navigation/Navbar.tsx`, `frontend/src/features/catalog/MovieGrid.tsx`, `frontend/src/features/home/HeroBanner.tsx`, `frontend/src/features/catalog/MovieRow.tsx`, `frontend/src/features/library/LibraryView.tsx`, `frontend/src/app/index.css` | Hoàn tất trong tree: DOMPurify + dialog semantics, keyboard card, combobox search |
@@ -84,8 +84,8 @@ Cập nhật: 2026-10-23 (sau refactor frontend/backend)
 Chạy tại `D:\Phim`:
 
 ```text
-npm run test:web        -> 8 test files, 61 tests passed
-npm run test:api        -> 27 unit + 27 e2e passed
+npm run test:web        -> 8 test files, 67 tests passed
+npm run test:api        -> 34 unit + 36 e2e passed (tổng 70 tests)
 npm run lint            -> clean (frontend + backend)
 npm run build:web       -> pass (tsc -b + vite build)
 npm run build:api       -> pass (nest build)
@@ -115,23 +115,16 @@ Kiểm tra thủ công bằng Chrome headless + CDP trên `vite preview`:
 - Nhảy trang không hợp lệ (`9999`): hiện `Trang phải là số từ 1 đến 717.` với `role="alert"` + `aria-invalid`; nhập `2` + Enter -> `?tab=phim-le&page=2`, ô nhập reset, lỗi biến mất.
 - Không có console error/warning hay request failed trong luồng home -> tab -> modal -> phân trang.
 
-- **Phối hợp Frontend ↔ Backend (Cập nhật 2026-10-21 22:52):**
-  - **Spec & Plan backend từ `opencode`:** Đã đồng bộ theo bản thiết kế [2026-10-21-cinehub-backend-design.md](file:///d:/Phim/docs/superpowers/specs/2026-10-21-cinehub-backend-design.md) và kế hoạch chi tiết [2026-10-21-cinehub-backend.md](file:///d:/Phim/docs/superpowers/plans/2026-10-21-cinehub-backend.md) (NestJS proxy trên port 3001, cache in-memory TTL/LRU, single-flight, hybrid compat `/api/compat` + normalized `/api/v1`).
+- **Phối hợp Frontend ↔ Backend (Cập nhật 2026-10-24 23:00):**
+  - **Phía Backend (`opencode`):**
+    - 70 test pass (34 unit + 36 e2e), lint clean, build pass.
+    - Cung cấp đầy đủ `/api/compat/*` (6 routes raw PhimAPI shape), `/api/v1/*` (normalized DTOs), CORS loopback mọi port trong dev (`localhost`, `127.0.0.1`, `[::1]`) và allowlist `CORS_ORIGINS` ở production.
+    - Rate limit 120 req/phút/IP dùng chung mọi route; riêng search 60 req/phút. Lỗi/failed envelope trả `Cache-Control: no-store`, có `X-Request-Id`, `X-Cache`, `Retry-After` và single-flight chống gọi upstream trùng.
+    - Swagger tại `/api/docs` đã có schema response, query/path parameter và error schema dùng chung.
   - **Phía Frontend (`anty`):**
-    - Đã cập nhật [frontend/src/shared/api.ts](file:///d:/Phim/frontend/src/shared/api.ts) hỗ trợ biến môi trường `VITE_API_BASE_URL` linh hoạt (mặc định fallback về `https://phimapi.com` khi backend chưa bật, hoặc trỏ tới `http://localhost:3001/api/compat` khi backend chạy).
-    - Đã tạo [.env.example](file:///d:/Phim/.env.example) hướng dẫn kết nối backend 1 dòng.
-    - Đã cập nhật `connect-src` trong [frontend/vite.config.ts](file:///d:/Phim/frontend/vite.config.ts) CSP cho phép `http://localhost:3001` và `http://127.0.0.1:3001`.
-    - Đã cập nhật [frontend/public/sw.js](file:///d:/Phim/frontend/public/sw.js) nhận diện các route `/api/compat` và `/api/v1` vào cache API `cinehub-api-v3`.
-    - Đã bổ sung bộ unit test trong [frontend/src/shared/sw.test.ts](file:///d:/Phim/frontend/src/shared/sw.test.ts) kiểm chứng luồng định tuyến cache của `/api/compat` và `/api/v1`. Toàn bộ 61/61 test frontend pass 100%.
-    - Frontend đã sẵn sàng cấu hình `VITE_API_BASE_URL`.
-
-### Backend implementation
-
-- Backend NestJS nằm trong `backend/`; không sửa frontend trong đợt này.
-- Compat: `/api/compat/*` giữ nguyên path/JSON PhimAPI; đặt `VITE_API_BASE_URL=http://localhost:3001/api/compat`.
-- Normalized: `/api/v1/*`; contract đầy đủ tại `docs/backend-api.md`.
-- Cache in-memory TTL + LRU, single-flight; chưa có auth/DB/Redis.
-- CORS mặc định cho `http://localhost:5173` và `http://localhost:4173`; rate limit 120 request/phút.
-- Trạng thái: backend routes và security đã có test; chờ xác nhận 6 luồng compat (home, catalog, genre, country, search, detail/watch) từ frontend.
-
+    - Chuyển đổi thành công sang chuẩn Normalized API v1: `VITE_API_BASE_URL=http://localhost:3001/api/v1`.
+    - Bổ sung **Chỉ báo tập phim đã xem (Watched Episodes Indicator)**: theo dõi tiến trình từng tập riêng biệt trong `storage.ts`, hiển thị huy hiệu dấu tích xanh ngọc (emerald checkmark) và thanh tiến trình trong `VideoPlayer.tsx` và `MovieDetailModal.tsx`.
+    - Bổ sung **Bộ lọc & Sắp xếp nâng cao (Sort & Filter)** trong `MovieGrid.tsx`: thêm lọc theo điểm số đánh giá TMDB (`⭐ 8.0+`, `⭐ 7.0+`, `⭐ 6.0+`), bổ sung các tùy chọn sắp xếp mới (`Lượt đánh giá`, `Năm mới nhất`, `Năm cũ nhất`), và thanh chip bộ lọc đang áp dụng với nút xóa nhanh.
+    - Đã ngăn chặn vòng lặp re-fetch trong `HeroBanner.tsx` bằng `attemptedSlugsRef` và memoize `heroBannerMovies`.
+    - Toàn bộ **137/137 test pass** trên toàn dự án (67 web + 70 backend), lint clean, build web & api 100% pass.
 

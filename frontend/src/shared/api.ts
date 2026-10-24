@@ -6,6 +6,8 @@ import type {
   MovieDetailResponse,
   MovieItem,
   NewUpdatedResponse,
+  NormalizedDetailResponse,
+  NormalizedListResponse,
 } from './types';
 import { safeStreamUrl } from './validation';
 import { buildTmdbEmbedUrl } from './tmdb';
@@ -14,6 +16,12 @@ export function getBaseUrl(): string {
   const envUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim().replace(/\/+$/, '');
   return envUrl || 'https://phimapi.com';
 }
+
+export function isV1Api(): boolean {
+  const url = getBaseUrl();
+  return url.endsWith('/api/v1') || url.includes('/api/v1');
+}
+
 
 const IMAGE_CDN = 'https://phimimg.com';
 
@@ -227,6 +235,18 @@ async function fetchWithCache<T>(
 }
 
 export async function getNewUpdatedMovies(page = 1): Promise<{ items: MovieItem[]; totalPages: number }> {
+  if (isV1Api()) {
+    const data = await fetchWithCache<NormalizedListResponse>(
+      `${getBaseUrl()}/movies/new?page=${page}`,
+      2 * 60 * 1000
+    );
+    if (!data) return { items: [], totalPages: 1 };
+    return {
+      items: (data.items || []).map(sanitizeMovieItem),
+      totalPages: data.pagination?.totalPages || 1,
+    };
+  }
+
   const data = await fetchWithCache<NewUpdatedResponse>(
     `${getBaseUrl()}/danh-sach/phim-moi-cap-nhat?page=${page}`,
     2 * 60 * 1000
@@ -243,6 +263,20 @@ export async function getCatalogMovies(
   page = 1,
   signal?: AbortSignal
 ): Promise<{ items: MovieItem[]; title: string; totalPages: number }> {
+  if (isV1Api()) {
+    const data = await fetchWithCache<NormalizedListResponse>(
+      `${getBaseUrl()}/movies?type=${type}&page=${page}`,
+      undefined,
+      signal
+    );
+    if (!data) return { items: [], title: '', totalPages: 1 };
+    return {
+      items: (data.items || []).map(sanitizeMovieItem),
+      title: data.title || '',
+      totalPages: data.pagination?.totalPages || 1,
+    };
+  }
+
   const data = await fetchWithCache<CatalogResponse>(
     `${getBaseUrl()}/v1/api/danh-sach/${type}?page=${page}`,
     undefined,
@@ -263,6 +297,21 @@ export async function getGenreMovies(
 ): Promise<{ items: MovieItem[]; title: string; totalPages: number }> {
   const cleanSlug = encodeURIComponent(slug?.trim() || '');
   if (!cleanSlug) return { items: [], title: '', totalPages: 1 };
+
+  if (isV1Api()) {
+    const data = await fetchWithCache<NormalizedListResponse>(
+      `${getBaseUrl()}/genres/${cleanSlug}/movies?page=${page}`,
+      undefined,
+      signal
+    );
+    if (!data) return { items: [], title: '', totalPages: 1 };
+    return {
+      items: (data.items || []).map(sanitizeMovieItem),
+      title: data.title || 'Thể Loại',
+      totalPages: data.pagination?.totalPages || 1,
+    };
+  }
+
   const data = await fetchWithCache<CatalogResponse>(
     `${getBaseUrl()}/v1/api/the-loai/${cleanSlug}?page=${page}`,
     undefined,
@@ -283,6 +332,21 @@ export async function getCountryMovies(
 ): Promise<{ items: MovieItem[]; title: string; totalPages: number }> {
   const cleanSlug = encodeURIComponent(slug?.trim() || '');
   if (!cleanSlug) return { items: [], title: '', totalPages: 1 };
+
+  if (isV1Api()) {
+    const data = await fetchWithCache<NormalizedListResponse>(
+      `${getBaseUrl()}/countries/${cleanSlug}/movies?page=${page}`,
+      undefined,
+      signal
+    );
+    if (!data) return { items: [], title: '', totalPages: 1 };
+    return {
+      items: (data.items || []).map(sanitizeMovieItem),
+      title: data.title || 'Quốc Gia',
+      totalPages: data.pagination?.totalPages || 1,
+    };
+  }
+
   const data = await fetchWithCache<CatalogResponse>(
     `${getBaseUrl()}/v1/api/quoc-gia/${cleanSlug}?page=${page}`,
     undefined,
@@ -302,6 +366,20 @@ export async function searchMovies(
   signal?: AbortSignal
 ): Promise<{ items: MovieItem[]; totalPages: number }> {
   if (!keyword.trim()) return { items: [], totalPages: 1 };
+
+  if (isV1Api()) {
+    const data = await fetchWithCache<NormalizedListResponse>(
+      `${getBaseUrl()}/search?q=${encodeURIComponent(keyword.trim())}&page=${page}`,
+      60 * 1000,
+      signal
+    );
+    if (!data) return { items: [], totalPages: 1 };
+    return {
+      items: (data.items || []).map(sanitizeMovieItem),
+      totalPages: data.pagination?.totalPages || 1,
+    };
+  }
+
   const data = await fetchWithCache<CatalogResponse>(
     `${getBaseUrl()}/v1/api/tim-kiem?keyword=${encodeURIComponent(keyword.trim())}&page=${page}`,
     60 * 1000,
@@ -353,16 +431,31 @@ export async function getMovieDetail(slug: string): Promise<MovieDetail | null> 
   const cleanSlug = encodeURIComponent(slug?.trim() || '');
   if (!cleanSlug) return null;
   try {
-    const data = await fetchWithCache<MovieDetailResponse>(
-      `${getBaseUrl()}/phim/${cleanSlug}`,
-      6 * 60 * 1000
-    );
-    if (!data || !data.status || !data.movie) return null;
+    let rawMovie: MovieDetail | undefined;
+    let rawEpisodes: EpisodeServer[] | undefined;
+
+    if (isV1Api()) {
+      const data = await fetchWithCache<NormalizedDetailResponse>(
+        `${getBaseUrl()}/movies/${cleanSlug}`,
+        6 * 60 * 1000
+      );
+      if (!data || !data.movie) return null;
+      rawMovie = data.movie;
+      rawEpisodes = data.movie.episodes;
+    } else {
+      const data = await fetchWithCache<MovieDetailResponse>(
+        `${getBaseUrl()}/phim/${cleanSlug}`,
+        6 * 60 * 1000
+      );
+      if (!data || !data.status || !data.movie) return null;
+      rawMovie = data.movie;
+      rawEpisodes = data.episodes;
+    }
 
     const movie: MovieDetail = {
-      ...data.movie,
-      name: formatMovieTitle(data.movie.name),
-      episodes: sanitizeEpisodes(data.episodes),
+      ...rawMovie,
+      name: formatMovieTitle(rawMovie.name),
+      episodes: sanitizeEpisodes(rawEpisodes),
     };
 
     // Inject International TMDB Player option if TMDB id exists
@@ -416,7 +509,9 @@ export async function getMovieDetail(slug: string): Promise<MovieDetail | null> 
 export function prefetchMovieDetail(slug: string): void {
   const cleanSlug = encodeURIComponent(slug?.trim() || '');
   if (!cleanSlug) return;
-  const url = `${getBaseUrl()}/phim/${cleanSlug}`;
+  const url = isV1Api()
+    ? `${getBaseUrl()}/movies/${cleanSlug}`
+    : `${getBaseUrl()}/phim/${cleanSlug}`;
   if (!memoryCache.has(url) && !inFlightRequests.has(url)) {
     if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
       window.requestIdleCallback(() => {
@@ -429,4 +524,5 @@ export function prefetchMovieDetail(slug: string): void {
     }
   }
 }
+
 

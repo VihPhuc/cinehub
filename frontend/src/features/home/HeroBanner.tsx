@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Play, Info, Heart, Star, ChevronLeft, ChevronRight, Video, X } from 'lucide-react';
 import type { MovieItem, MovieDetail } from '@/shared/types';
 import { getImageUrl, prefetchMovieDetail, getMovieDetail, formatMovieTitle } from '@/shared/api';
@@ -37,10 +37,13 @@ export const HeroBanner: React.FC<Props> = ({
   const [index, setIndex] = useState(0);
   const [detailMap, setDetailMap] = useState<Record<string, MovieDetail>>({});
   const [showTrailerModal, setShowTrailerModal] = useState(false);
+  const attemptedSlugsRef = useRef<Set<string>>(new Set());
   const maxSlides = Math.min(movies.length, 8);
 
   const current = movies[index] || movies[0];
   const currentSlug = current?.slug;
+  const nextMovie = movies[(index + 1) % maxSlides];
+  const nextSlug = nextMovie?.slug;
   const activeDetail = currentSlug ? detailMap[currentSlug] : null;
   const trailerId = getYouTubeId(activeDetail?.trailer_url);
 
@@ -49,7 +52,8 @@ export const HeroBanner: React.FC<Props> = ({
     if (!currentSlug) return;
     let active = true;
 
-    if (!detailMap[currentSlug]) {
+    if (!detailMap[currentSlug] && !attemptedSlugsRef.current.has(currentSlug)) {
+      attemptedSlugsRef.current.add(currentSlug);
       getMovieDetail(currentSlug).then((d) => {
         if (active && d) {
           setDetailMap((prev) => ({ ...prev, [currentSlug]: d }));
@@ -58,12 +62,12 @@ export const HeroBanner: React.FC<Props> = ({
     }
 
     // Prefetch the next slide
-    const nextMovie = movies[(index + 1) % maxSlides];
-    if (nextMovie?.slug && !detailMap[nextMovie.slug]) {
-      prefetchMovieDetail(nextMovie.slug);
-      getMovieDetail(nextMovie.slug).then((d) => {
+    if (nextSlug && !detailMap[nextSlug] && !attemptedSlugsRef.current.has(nextSlug)) {
+      attemptedSlugsRef.current.add(nextSlug);
+      prefetchMovieDetail(nextSlug);
+      getMovieDetail(nextSlug).then((d) => {
         if (active && d) {
-          setDetailMap((prev) => ({ ...prev, [nextMovie.slug]: d }));
+          setDetailMap((prev) => ({ ...prev, [nextSlug]: d }));
         }
       });
     }
@@ -71,7 +75,7 @@ export const HeroBanner: React.FC<Props> = ({
     return () => {
       active = false;
     };
-  }, [currentSlug, index, maxSlides, movies, detailMap]);
+  }, [currentSlug, nextSlug, detailMap]);
 
   const handleNext = useCallback(() => {
     setIndex((prev) => (prev + 1) % maxSlides);

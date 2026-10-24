@@ -120,3 +120,21 @@ export interface MovieDetailResponse {
   movie?: MovieDetail;
   episodes?: EpisodeServer[];
 }
+
+/** Normalized list response: `GET /api/v1/movies/new`, `/api/v1/movies`, etc. */
+export interface NormalizedListResponse {
+  items: MovieItem[];
+  title?: string;
+  pagination: {
+    page: number;
+    totalPages: number;
+    totalItems?: number;
+    totalItemsPerPage?: number;
+  };
+}
+
+/** Normalized detail response: `GET /api/v1/movies/:slug` */
+export interface NormalizedDetailResponse {
+  movie: MovieDetail;
+}
+

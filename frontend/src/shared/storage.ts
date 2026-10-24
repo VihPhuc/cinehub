@@ -10,11 +10,19 @@ import {
 
 const FAVORITES_KEY = 'cineflix_favorites';
 const HISTORY_KEY = 'cineflix_history';
+const WATCHED_EPISODES_KEY = 'cineflix_watched_episodes';
 export const STORAGE_CHANGE_EVENT = 'cinehub:storage_change';
+
+export interface WatchedEpisodeInfo {
+  progress: number;
+  completed: boolean;
+  updatedAt: number;
+}
 
 // In-memory cache to avoid repeated JSON.parse across renders
 let memoryFavorites: FavoriteItem[] | null = null;
 let memoryHistory: HistoryItem[] | null = null;
+let memoryWatchedEpisodes: Record<string, Record<string, WatchedEpisodeInfo>> | null = null;
 
 function notifyChange(key: string) {
   if (typeof window !== 'undefined') {
@@ -30,6 +38,9 @@ if (typeof window !== 'undefined') {
     } else if (e.key === HISTORY_KEY) {
       memoryHistory = null;
       notifyChange(HISTORY_KEY);
+    } else if (e.key === WATCHED_EPISODES_KEY) {
+      memoryWatchedEpisodes = null;
+      notifyChange(WATCHED_EPISODES_KEY);
     }
   });
 }
@@ -141,8 +152,11 @@ export function saveHistory(entry: {
 
 export function clearHistory(): void {
   memoryHistory = [];
+  memoryWatchedEpisodes = {};
   localStorage.removeItem(HISTORY_KEY);
+  localStorage.removeItem(WATCHED_EPISODES_KEY);
   notifyChange(HISTORY_KEY);
+  notifyChange(WATCHED_EPISODES_KEY);
 }
 
 export function removeHistoryItem(slug: string, episodeSlug?: string): void {
@@ -153,8 +167,75 @@ export function removeHistoryItem(slug: string, episodeSlug?: string): void {
     memoryHistory = list;
     safeSetItem(HISTORY_KEY, JSON.stringify(list));
     notifyChange(HISTORY_KEY);
+
+    if (memoryWatchedEpisodes && memoryWatchedEpisodes[slug]) {
+      if (episodeSlug) {
+        delete memoryWatchedEpisodes[slug][episodeSlug];
+      } else {
+        delete memoryWatchedEpisodes[slug];
+      }
+      safeSetItem(WATCHED_EPISODES_KEY, JSON.stringify(memoryWatchedEpisodes));
+      notifyChange(WATCHED_EPISODES_KEY);
+    }
   } catch (e) {
     console.error('[storage] Failed to remove history item:', e);
+  }
+}
+
+export function getWatchedEpisodes(movieSlug: string): Record<string, WatchedEpisodeInfo> {
+  if (!movieSlug) return {};
+  if (!memoryWatchedEpisodes) {
+    try {
+      const raw = localStorage.getItem(WATCHED_EPISODES_KEY);
+      memoryWatchedEpisodes = raw
+        ? (JSON.parse(raw) as Record<string, Record<string, WatchedEpisodeInfo>>)
+        : {};
+    } catch {
+      memoryWatchedEpisodes = {};
+    }
+  }
+  return memoryWatchedEpisodes?.[movieSlug] ?? {};
+}
+
+export function isEpisodeCompleted(movieSlug: string, episodeSlug: string): boolean {
+  if (!movieSlug || !episodeSlug) return false;
+  const episodes = getWatchedEpisodes(movieSlug);
+  return Boolean(episodes[episodeSlug]?.completed || (episodes[episodeSlug]?.progress ?? 0) >= 85);
+}
+
+export function markEpisodeWatched(
+  movieSlug: string,
+  episodeSlug: string,
+  progress: number,
+  completed = false
+): void {
+  if (!movieSlug || !episodeSlug) return;
+  try {
+    if (!memoryWatchedEpisodes) {
+      const raw = localStorage.getItem(WATCHED_EPISODES_KEY);
+      memoryWatchedEpisodes = raw
+        ? (JSON.parse(raw) as Record<string, Record<string, WatchedEpisodeInfo>>)
+        : {};
+    }
+    const store = memoryWatchedEpisodes ?? {};
+    if (!store[movieSlug]) {
+      store[movieSlug] = {};
+    }
+    const prev = store[movieSlug][episodeSlug];
+    const normalizedProgress = Math.max(prev?.progress ?? 0, Math.min(100, Math.round(progress)));
+    const isCompleted = completed || (prev?.completed ?? false) || normalizedProgress >= 85;
+
+    store[movieSlug][episodeSlug] = {
+      progress: normalizedProgress,
+      completed: isCompleted,
+      updatedAt: Date.now(),
+    };
+
+    memoryWatchedEpisodes = store;
+    safeSetItem(WATCHED_EPISODES_KEY, JSON.stringify(store));
+    notifyChange(WATCHED_EPISODES_KEY);
+  } catch (e) {
+    console.error('[storage] Failed to mark episode watched:', e);
   }
 }
 
@@ -162,8 +243,16 @@ export function exportUserData(): string {
   const data = {
     favorites: getFavorites(),
     history: getHistory(),
+    watchedEpisodes: memoryWatchedEpisodes || (() => {
+      try {
+        const raw = localStorage.getItem(WATCHED_EPISODES_KEY);
+        return raw ? (JSON.parse(raw) as Record<string, Record<string, WatchedEpisodeInfo>>) : {};
+      } catch {
+        return {};
+      }
+    })(),
     exportedAt: new Date().toISOString(),
-    version: '1.1',
+    version: '1.2',
   };
   return JSON.stringify(data, null, 2);
 }

@@ -404,6 +404,7 @@ export function App() {
   };
 
   const favSlugs = useMemo(() => favorites.map((f) => f.slug), [favorites]);
+  const heroBannerMovies = useMemo(() => newUpdated.slice(0, 8), [newUpdated]);
 
   if (watchingMovie) {
     return (
@@ -486,7 +487,7 @@ export function App() {
         {activeTab === 'home' && (
           <>
             <HeroBanner
-              movies={newUpdated.slice(0, 8)}
+              movies={heroBannerMovies}
               onPlay={handleQuickPlay}
               onInfo={(m) => setSelectedSlug(m.slug)}
               favorites={favSlugs}

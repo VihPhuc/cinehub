@@ -18,7 +18,7 @@ import {
   RectangleHorizontal,
 } from 'lucide-react';
 import type { MovieDetail } from '@/shared/types';
-import { saveHistory, getHistory } from '@/shared/storage';
+import { saveHistory, getHistory, getWatchedEpisodes, markEpisodeWatched } from '@/shared/storage';
 import { decideHlsRecovery } from './hlsRecovery';
 import { formatMovieTitle, getImageUrl } from '@/shared/api';
 
@@ -83,6 +83,7 @@ export const VideoPlayer: React.FC<Props> = ({
   const [currentQuality, setCurrentQuality] = useState<number>(-1);
   const [autoNextCountdown, setAutoNextCountdown] = useState<number | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [watchedMap, setWatchedMap] = useState(() => getWatchedEpisodes(movie.slug));
 
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -450,9 +451,26 @@ export const VideoPlayer: React.FC<Props> = ({
         currentTime: Math.floor(video.currentTime),
         duration: Math.floor(video.duration || 0),
       });
+
+      const pct = video.duration > 0 ? (video.currentTime / video.duration) * 100 : 0;
+      const isDone = pct >= 85;
+      markEpisodeWatched(movie.slug, ep.slug, pct, isDone);
+      setWatchedMap((prev) => ({
+        ...prev,
+        [ep.slug]: {
+          progress: Math.max(prev[ep.slug]?.progress ?? 0, Math.round(pct)),
+          completed: isDone || Boolean(prev[ep.slug]?.completed),
+          updatedAt: Date.now(),
+        },
+      }));
     };
 
     const onEnded = () => {
+      markEpisodeWatched(movie.slug, ep.slug, 100, true);
+      setWatchedMap((prev) => ({
+        ...prev,
+        [ep.slug]: { progress: 100, completed: true, updatedAt: Date.now() },
+      }));
       if (hasNext) {
         setAutoNextCountdown(5);
       }
@@ -605,42 +623,49 @@ export const VideoPlayer: React.FC<Props> = ({
   }, [toggleFullscreen, showToast, showShortcutsModal]);
 
   return (
-    <div className="min-h-screen bg-[#07080c] text-white flex flex-col font-sans relative">
+    <div className="min-h-screen bg-[#07080c] text-white flex flex-col font-sans relative overflow-x-hidden">
       {/* Top Bar Header */}
-      <div className="sticky top-0 z-40 h-16 px-4 sm:px-6 bg-[#090a0f]/90 backdrop-blur-xl border-b border-white/[0.08] flex items-center justify-between gap-3">
+      <div className="sticky top-0 z-40 h-16 px-3 sm:px-6 bg-[#090a0f]/90 backdrop-blur-xl border-b border-white/[0.08] flex items-center justify-between gap-2 sm:gap-3">
+        {/* Back Button */}
         <button
           onClick={onBack}
-          className="flex items-center gap-2 h-11 min-h-[44px] px-3.5 rounded-xl glass-pill hover:bg-white/15 text-xs sm:text-sm font-bold text-zinc-300 hover:text-white transition-all cursor-pointer border border-white/10 shrink-0 focus-visible:ring-2 focus-visible:ring-red-500"
+          aria-label="Quay lại"
+          className="flex items-center justify-center sm:justify-start gap-2 h-11 min-h-[44px] min-w-[44px] px-3 sm:px-3.5 rounded-xl glass-pill hover:bg-white/15 text-xs sm:text-sm font-bold text-zinc-300 hover:text-white transition-all cursor-pointer border border-white/10 shrink-0 focus-visible:ring-2 focus-visible:ring-red-500"
         >
           <ArrowLeft className="w-4 h-4 text-zinc-400" />
-          <span>Quay lại</span>
+          <span className="hidden sm:inline">Quay lại</span>
         </button>
 
-        <div className="truncate px-2 sm:px-4 text-center max-w-md">
-          <span className="font-extrabold text-sm sm:text-base text-zinc-100 font-heading">
-            {formatMovieTitle(movie.name)}
-          </span>
-          {ep && (
-            <span className="px-2 py-0.5 ml-2 rounded-md bg-red-600/20 text-red-400 font-bold text-xs border border-red-500/30">
-              {ep.name}
+        {/* Title & Current Episode */}
+        <div className="min-w-0 flex-1 px-1 sm:px-4 text-left sm:text-center">
+          <div className="flex items-center sm:justify-center gap-1.5 truncate">
+            <span className="font-extrabold text-xs sm:text-base text-zinc-100 font-heading truncate">
+              {formatMovieTitle(movie.name)}
             </span>
-          )}
+            {ep && (
+              <span className="px-1.5 sm:px-2 py-0.5 rounded-md bg-red-600/20 text-red-400 font-bold text-[10px] sm:text-xs border border-red-500/30 shrink-0">
+                {ep.name}
+              </span>
+            )}
+          </div>
         </div>
 
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+        {/* Action Controls */}
+        <div className="flex items-center gap-1 sm:gap-2 shrink-0">
           {/* Sleep Timer */}
           <div className="relative">
             <button
               onClick={() => setShowTimerMenu(!showTimerMenu)}
-              className={`flex items-center gap-1.5 h-11 min-h-[44px] px-3 rounded-xl text-xs font-bold cursor-pointer transition-all border ${
+              className={`flex items-center justify-center gap-1.5 h-11 min-h-[44px] min-w-[44px] px-2.5 sm:px-3 rounded-xl text-xs font-bold cursor-pointer transition-all border ${
                 sleepRemaining !== null
                   ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-sm shadow-amber-500/20'
                   : 'glass-pill text-zinc-300 hover:text-white hover:bg-white/15 border-white/10'
               }`}
               title="Hẹn giờ tắt"
+              aria-label="Hẹn giờ tắt video"
             >
-              <Timer className="w-3.5 h-3.5 text-amber-400" />
-              <span className="hidden sm:inline">
+              <Timer className="w-4 h-4 text-amber-400" />
+              <span className="hidden md:inline">
                 {sleepRemaining !== null ? formatTime(sleepRemaining) : 'Hẹn giờ'}
               </span>
             </button>
@@ -674,7 +699,7 @@ export const VideoPlayer: React.FC<Props> = ({
           <button
             onClick={toggleAmbientGlow}
             aria-pressed={ambientGlow}
-            className={`flex items-center gap-1.5 h-11 min-h-[44px] px-3 rounded-xl text-xs font-bold cursor-pointer transition-all border ${
+            className={`flex items-center justify-center gap-1.5 h-11 min-h-[44px] min-w-[44px] px-2.5 sm:px-3 rounded-xl text-xs font-bold cursor-pointer transition-all border ${
               ambientGlow
                 ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-sm shadow-amber-500/20'
                 : 'glass-pill text-zinc-400 hover:text-zinc-200 border-white/10'
@@ -682,15 +707,15 @@ export const VideoPlayer: React.FC<Props> = ({
             title="Bật/Tắt ánh sáng hắt rạp phim (Phím G)"
             aria-label="Hiệu ứng ánh sáng rạp phim Ambient Glow"
           >
-            <Sparkles className={`w-3.5 h-3.5 ${ambientGlow ? 'text-amber-400 fill-amber-400/30' : 'text-zinc-400'}`} />
+            <Sparkles className={`w-4 h-4 ${ambientGlow ? 'text-amber-400 fill-amber-400/30' : 'text-zinc-400'}`} />
             <span className="hidden xl:inline">{ambientGlow ? 'Đèn Rạp' : 'Tắt Đèn'}</span>
           </button>
 
-          {/* Theater Mode */}
+          {/* Theater Mode (Desktop/Tablet >= md only, screen is already full width on mobile) */}
           <button
             onClick={toggleTheaterMode}
             aria-pressed={theaterMode}
-            className={`flex items-center gap-1.5 h-11 min-h-[44px] px-3 rounded-xl text-xs font-bold cursor-pointer transition-all border ${
+            className={`hidden md:flex items-center gap-1.5 h-11 min-h-[44px] px-3 rounded-xl text-xs font-bold cursor-pointer transition-all border ${
               theaterMode
                 ? 'bg-gradient-to-r from-red-600 to-rose-600 text-white border-red-500 shadow-md shadow-red-600/30 glow-red-sm'
                 : 'glass-pill text-zinc-300 hover:text-white hover:bg-white/15 border-white/10'
@@ -699,7 +724,7 @@ export const VideoPlayer: React.FC<Props> = ({
             aria-label="Chế độ rạp phim Theater Mode"
           >
             <RectangleHorizontal className="w-4 h-4" />
-            <span className="hidden md:inline">{theaterMode ? 'Thu nhỏ' : 'Rạp Phim'}</span>
+            <span className="hidden lg:inline">{theaterMode ? 'Thu nhỏ' : 'Rạp Phim'}</span>
           </button>
 
           {/* Picture in Picture */}
@@ -714,10 +739,10 @@ export const VideoPlayer: React.FC<Props> = ({
             </button>
           )}
 
-          {/* Keyboard shortcuts */}
+          {/* Keyboard shortcuts (Hidden on mobile < sm) */}
           <button
             onClick={() => setShowShortcutsModal(true)}
-            className="flex items-center justify-center w-11 h-11 min-w-[44px] min-h-[44px] glass-pill hover:bg-white/15 text-zinc-300 hover:text-white rounded-xl text-xs font-bold cursor-pointer border border-white/10 transition-all"
+            className="hidden sm:flex items-center justify-center w-11 h-11 min-w-[44px] min-h-[44px] glass-pill hover:bg-white/15 text-zinc-300 hover:text-white rounded-xl text-xs font-bold cursor-pointer border border-white/10 transition-all"
             title="Bảng phím tắt (?)"
             aria-label="Bảng phím tắt trợ năng"
           >
@@ -727,22 +752,24 @@ export const VideoPlayer: React.FC<Props> = ({
           {/* Share */}
           <button
             onClick={handleShare}
-            className="flex items-center gap-1.5 h-11 min-h-[44px] px-3 glass-pill hover:bg-white/15 text-zinc-300 hover:text-white rounded-xl text-xs font-bold cursor-pointer border border-white/10 transition-all"
+            className="flex items-center justify-center gap-1.5 h-11 min-h-[44px] min-w-[44px] px-2.5 sm:px-3 glass-pill hover:bg-white/15 text-zinc-300 hover:text-white rounded-xl text-xs font-bold cursor-pointer border border-white/10 transition-all"
             title="Sao chép liên kết tập phim"
             aria-label="Chia sẻ liên kết tập phim"
           >
             <Share2 className="w-4 h-4 text-zinc-400" />
-            <span className="hidden sm:inline">Chia sẻ</span>
+            <span className="hidden lg:inline">Chia sẻ</span>
           </button>
 
           {/* Next Episode Button */}
           {hasNext && (
             <button
               onClick={() => selectEpisode(epIdx + 1)}
-              className="flex items-center gap-1.5 h-11 min-h-[44px] px-3.5 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 rounded-xl text-xs font-black cursor-pointer shadow-md shadow-red-600/30 transition-all hover:scale-105"
+              className="flex items-center justify-center gap-1.5 h-11 min-h-[44px] min-w-[44px] px-2.5 sm:px-3.5 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 rounded-xl text-xs font-black cursor-pointer shadow-md shadow-red-600/30 transition-all hover:scale-105 shrink-0"
+              title="Tập tiếp theo"
+              aria-label="Tập tiếp theo"
             >
-              <span>Tập tiếp</span>
-              <SkipForward className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Tập tiếp</span>
+              <SkipForward className="w-4 h-4" />
             </button>
           )}
         </div>
@@ -912,8 +939,8 @@ export const VideoPlayer: React.FC<Props> = ({
         }`}
       >
         {/* Quick shortcuts info bar */}
-        <div className="flex flex-wrap items-center justify-between text-[11px] text-zinc-400 px-2 py-1">
-          <div className="flex flex-wrap items-center gap-3 font-medium">
+        <div className="flex flex-wrap items-center justify-between text-[11px] text-zinc-400 px-2 py-1 gap-2">
+          <div className="hidden sm:flex flex-wrap items-center gap-3 font-medium">
             <span>
               <strong className="text-zinc-200">Phím tắt:</strong> [Space/K] Tạm dừng
             </span>
@@ -924,7 +951,7 @@ export const VideoPlayer: React.FC<Props> = ({
             <span>[G] Đèn rạp</span>
             <span>[F] Toàn màn hình</span>
           </div>
-          <div>
+          <div className="w-full sm:w-auto text-left sm:text-right">
             Nguồn phát:{' '}
             <span className="text-red-400 font-bold">{server?.server_name || 'Mặc định'}</span>
           </div>
@@ -1052,30 +1079,42 @@ export const VideoPlayer: React.FC<Props> = ({
                     )
                     .map(({ e, idx }) => {
                       const isCurrent = epIdx === idx;
-                      const pct = episodeProgressMap.get(e.slug) ?? 0;
-                      const isCompleted = pct >= 90;
+                      const watched = watchedMap[e.slug];
+                      const isCompleted = Boolean(watched?.completed || (watched?.progress ?? 0) >= 85);
+                      const pct = watched?.progress ?? (episodeProgressMap.get(e.slug) ?? 0);
                       return (
                         <button
                           key={e.slug}
                           onClick={() => selectEpisode(idx)}
-                          aria-label={`Tập ${e.name}${pct > 0 ? `, đã xem ${pct}%` : ''}`}
+                          aria-label={`Tập ${e.name}${isCompleted ? ' (Đã xem)' : pct > 0 ? `, đã xem ${pct}%` : ''}`}
+                          title={`Tập ${e.name}${isCompleted ? ' - Đã xem xong' : pct > 0 ? ` - Đã xem ${pct}%` : ''}`}
                           className={`relative min-h-[44px] py-2 px-2.5 rounded-xl text-xs font-bold border truncate cursor-pointer transition-all flex flex-col items-center justify-center gap-0.5 overflow-hidden ${
                             isCurrent
-                              ? 'bg-gradient-to-r from-red-600 to-rose-600 border-red-500 text-white shadow-md shadow-red-600/40 glow-red-sm scale-105'
-                              : 'glass-pill border-white/[0.08] text-zinc-300 hover:text-white hover:bg-white/10'
+                              ? 'bg-gradient-to-r from-red-600 to-rose-600 border-red-500 text-white shadow-md shadow-red-600/40 glow-red-sm scale-105 z-10'
+                              : isCompleted
+                                ? 'bg-emerald-950/20 hover:bg-emerald-950/35 border-emerald-500/35 text-emerald-300 hover:text-white shadow-sm shadow-emerald-900/20'
+                                : pct > 0
+                                  ? 'glass-pill border-amber-500/30 text-amber-200 hover:text-white hover:bg-white/10'
+                                  : 'glass-pill border-white/[0.08] text-zinc-300 hover:text-white hover:bg-white/10'
                           }`}
                         >
                           <div className="flex items-center gap-1.5 truncate max-w-full">
                             <span className="truncate">{e.name}</span>
                             {isCompleted && !isCurrent && (
-                              <Check className="w-3 h-3 text-emerald-400 shrink-0" />
+                              <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-emerald-500/20 text-emerald-400 shrink-0">
+                                <Check className="w-2.5 h-2.5 stroke-[3]" />
+                              </span>
                             )}
                           </div>
                           {pct > 0 && (
                             <div className="w-full absolute bottom-0 inset-x-0 h-1 bg-black/50 overflow-hidden">
                               <div
                                 className={`h-full transition-all duration-300 ${
-                                  isCurrent ? 'bg-amber-300 shadow-sm shadow-amber-300' : 'bg-red-500'
+                                  isCurrent
+                                    ? 'bg-amber-300 shadow-sm shadow-amber-300'
+                                    : isCompleted
+                                      ? 'bg-emerald-500'
+                                      : 'bg-red-500'
                                 }`}
                                 style={{ width: `${pct}%` }}
                               />

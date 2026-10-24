@@ -105,3 +105,22 @@ describe('getFavorites/getHistory với dữ liệu localStorage hỏng', () => 
     expect(getHistory().map((h) => h.slug)).toEqual(['ok']);
   });
 });
+
+describe('Watched Episodes tracking', () => {
+  it('lưu tiến trình và đánh dấu hoàn thành tập phim chính xác', async () => {
+    const { getWatchedEpisodes, markEpisodeWatched, isEpisodeCompleted } = await import('./storage');
+
+    expect(isEpisodeCompleted('naruto', 'tap-1')).toBe(false);
+
+    markEpisodeWatched('naruto', 'tap-1', 45, false);
+    expect(isEpisodeCompleted('naruto', 'tap-1')).toBe(false);
+    expect(getWatchedEpisodes('naruto')['tap-1'].progress).toBe(45);
+
+    markEpisodeWatched('naruto', 'tap-1', 90, false);
+    expect(isEpisodeCompleted('naruto', 'tap-1')).toBe(true);
+
+    markEpisodeWatched('naruto', 'tap-2', 10, true);
+    expect(isEpisodeCompleted('naruto', 'tap-2')).toBe(true);
+    expect(getWatchedEpisodes('naruto')['tap-2'].completed).toBe(true);
+  });
+});

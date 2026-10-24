@@ -40,11 +40,14 @@ export const MovieGrid: React.FC<Props> = ({
   const [jumpPage, setJumpPage] = useState('');
   const [jumpError, setJumpError] = useState<string | null>(null);
   const [selectedYear, setSelectedYear] = useState<string>('all');
+  const [selectedRating, setSelectedRating] = useState<string>('all');
   const [selectedGenre, setSelectedGenre] = useState<string>('all');
   const [selectedCountry, setSelectedCountry] = useState<string>('all');
   const [selectedLang, setSelectedLang] = useState<string>('all');
   const [selectedCinema, setSelectedCinema] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<'default' | 'rating' | 'year' | 'name'>('default');
+  const [sortBy, setSortBy] = useState<
+    'default' | 'rating' | 'votes' | 'year-desc' | 'year-asc' | 'name'
+  >('default');
   const [filterSearch, setFilterSearch] = useState('');
 
   const availableYears = useMemo(() => {
@@ -79,6 +82,7 @@ export const MovieGrid: React.FC<Props> = ({
 
   const hasActiveFilters =
     selectedYear !== 'all' ||
+    selectedRating !== 'all' ||
     selectedGenre !== 'all' ||
     selectedCountry !== 'all' ||
     selectedLang !== 'all' ||
@@ -88,6 +92,7 @@ export const MovieGrid: React.FC<Props> = ({
 
   const resetFilters = () => {
     setSelectedYear('all');
+    setSelectedRating('all');
     setSelectedGenre('all');
     setSelectedCountry('all');
     setSelectedLang('all');
@@ -101,6 +106,13 @@ export const MovieGrid: React.FC<Props> = ({
       .filter((m) => {
         // Filter year
         if (selectedYear !== 'all' && String(m.year) !== selectedYear) return false;
+
+        // Filter rating
+        if (selectedRating !== 'all') {
+          const minScore = Number(selectedRating);
+          const score = m.tmdb?.vote_average || 0;
+          if (score < minScore) return false;
+        }
 
         // Filter genre
         if (selectedGenre !== 'all') {
@@ -153,11 +165,27 @@ export const MovieGrid: React.FC<Props> = ({
           const rB = b.tmdb?.vote_average || 0;
           return rB - rA;
         }
+        if (sortBy === 'votes') {
+          const vA = a.tmdb?.vote_count || 0;
+          const vB = b.tmdb?.vote_count || 0;
+          return vB - vA;
+        }
         if (sortBy === 'name') return a.name.localeCompare(b.name);
-        if (sortBy === 'year') return (b.year || 0) - (a.year || 0);
+        if (sortBy === 'year-desc') return (b.year || 0) - (a.year || 0);
+        if (sortBy === 'year-asc') return (a.year || 0) - (b.year || 0);
         return 0;
       });
-  }, [movies, selectedYear, selectedGenre, selectedCountry, selectedLang, selectedCinema, filterSearch, sortBy]);
+  }, [
+    movies,
+    selectedYear,
+    selectedRating,
+    selectedGenre,
+    selectedCountry,
+    selectedLang,
+    selectedCinema,
+    filterSearch,
+    sortBy,
+  ]);
 
   const handleJump = (e: React.FormEvent) => {
     e.preventDefault();
@@ -314,12 +342,28 @@ export const MovieGrid: React.FC<Props> = ({
               </select>
             </div>
 
+            {/* Rating filter */}
+            <div className="flex items-center gap-1 text-xs text-zinc-300">
+              <select
+                value={selectedRating}
+                onChange={(e) => setSelectedRating(e.target.value)}
+                aria-label="Lọc theo điểm đánh giá"
+                className="bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.1] rounded-xl px-2.5 py-1.5 text-white text-xs focus:outline-none focus:border-red-500 cursor-pointer transition-colors"
+              >
+                <option value="all" className="bg-[#10121a]">Mọi điểm số</option>
+                <option value="8" className="bg-[#10121a]">⭐ Từ 8.0 trở lên</option>
+                <option value="7" className="bg-[#10121a]">⭐ Từ 7.0 trở lên</option>
+                <option value="6" className="bg-[#10121a]">⭐ Từ 6.0 trở lên</option>
+              </select>
+            </div>
+
             {/* Year filter */}
             {availableYears.length > 1 && (
               <div className="flex items-center gap-1 text-xs text-zinc-300">
                 <select
                   value={selectedYear}
                   onChange={(e) => setSelectedYear(e.target.value)}
+                  aria-label="Lọc theo năm phát hành"
                   className="bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.1] rounded-xl px-2.5 py-1.5 text-white text-xs focus:outline-none focus:border-red-500 cursor-pointer transition-colors"
                 >
                   <option value="all" className="bg-[#10121a]">Tất cả năm</option>
@@ -340,15 +384,145 @@ export const MovieGrid: React.FC<Props> = ({
               </span>
               <select
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as 'default' | 'rating' | 'year' | 'name')}
+                onChange={(e) =>
+                  setSortBy(
+                    e.target.value as
+                      | 'default'
+                      | 'rating'
+                      | 'votes'
+                      | 'year-desc'
+                      | 'year-asc'
+                      | 'name'
+                  )
+                }
+                aria-label="Sắp xếp danh sách phim"
                 className="bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.1] rounded-xl px-2.5 py-1.5 text-white text-xs focus:outline-none focus:border-red-500 cursor-pointer transition-colors"
               >
                 <option value="default" className="bg-[#10121a]">Mới cập nhật</option>
-                <option value="rating" className="bg-[#10121a]">Điểm TMDB cao nhất</option>
-                <option value="year" className="bg-[#10121a]">Năm phát hành</option>
-                <option value="name" className="bg-[#10121a]">Tên A-Z</option>
+                <option value="rating" className="bg-[#10121a]">⭐ Điểm TMDB cao nhất</option>
+                <option value="votes" className="bg-[#10121a]">🔥 Đánh giá nhiều nhất</option>
+                <option value="year-desc" className="bg-[#10121a]">📅 Năm mới nhất</option>
+                <option value="year-asc" className="bg-[#10121a]">⏳ Năm cũ nhất</option>
+                <option value="name" className="bg-[#10121a]">🔤 Tên A-Z</option>
               </select>
             </div>
+          </div>
+        )}
+
+        {/* Active Filter Chips */}
+        {!loading && hasActiveFilters && (
+          <div className="flex items-center gap-2 flex-wrap pt-1 text-xs">
+            <span className="text-zinc-400 font-semibold text-[11px]">Đang lọc:</span>
+            {selectedYear !== 'all' && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-red-600/15 border border-red-500/30 text-red-300 font-medium text-[11px]">
+                Năm: {selectedYear}
+                <button
+                  type="button"
+                  onClick={() => setSelectedYear('all')}
+                  className="hover:text-white ml-0.5 cursor-pointer"
+                  title="Bỏ lọc năm"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {selectedRating !== 'all' && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-300 font-medium text-[11px]">
+                ⭐ {selectedRating}.0+
+                <button
+                  type="button"
+                  onClick={() => setSelectedRating('all')}
+                  className="hover:text-white ml-0.5 cursor-pointer"
+                  title="Bỏ lọc điểm đánh giá"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {selectedGenre !== 'all' && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-rose-600/15 border border-rose-500/30 text-rose-300 font-medium text-[11px]">
+                {availableGenres.find((g) => g.slug === selectedGenre)?.name || selectedGenre}
+                <button
+                  type="button"
+                  onClick={() => setSelectedGenre('all')}
+                  className="hover:text-white ml-0.5 cursor-pointer"
+                  title="Bỏ lọc thể loại"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {selectedCountry !== 'all' && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-sky-600/15 border border-sky-500/30 text-sky-300 font-medium text-[11px]">
+                {availableCountries.find((c) => c.slug === selectedCountry)?.name || selectedCountry}
+                <button
+                  type="button"
+                  onClick={() => setSelectedCountry('all')}
+                  className="hover:text-white ml-0.5 cursor-pointer"
+                  title="Bỏ lọc quốc gia"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {selectedLang !== 'all' && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-purple-600/15 border border-purple-500/30 text-purple-300 font-medium text-[11px]">
+                {selectedLang === 'vietsub'
+                  ? 'Vietsub'
+                  : selectedLang === 'thuyet-minh'
+                    ? 'Thuyết Minh'
+                    : 'Lồng Tiếng'}
+                <button
+                  type="button"
+                  onClick={() => setSelectedLang('all')}
+                  className="hover:text-white ml-0.5 cursor-pointer"
+                  title="Bỏ lọc bản dịch"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {selectedCinema !== 'all' && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-300 font-medium text-[11px]">
+                Chiếu Rạp
+                <button
+                  type="button"
+                  onClick={() => setSelectedCinema('all')}
+                  className="hover:text-white ml-0.5 cursor-pointer"
+                  title="Bỏ lọc chiếu rạp"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {sortBy !== 'default' && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-white/10 border border-white/20 text-zinc-200 font-medium text-[11px]">
+                {sortBy === 'rating'
+                  ? '⭐ Điểm TMDB'
+                  : sortBy === 'votes'
+                    ? '🔥 Đánh giá nhiều nhất'
+                    : sortBy === 'year-desc'
+                      ? '📅 Năm mới nhất'
+                      : sortBy === 'year-asc'
+                        ? '⏳ Năm cũ nhất'
+                        : '🔤 Tên A-Z'}
+                <button
+                  type="button"
+                  onClick={() => setSortBy('default')}
+                  className="hover:text-white ml-0.5 cursor-pointer"
+                  title="Bỏ sắp xếp"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="text-red-400 hover:text-red-300 text-[11px] font-bold underline ml-1 cursor-pointer"
+            >
+              Xóa tất cả
+            </button>
           </div>
         )}
       </div>
