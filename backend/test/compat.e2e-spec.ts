@@ -60,6 +60,36 @@ describe('Compat API', () => {
     ).toHaveLength(before + 1);
   });
 
+  it('coalesces concurrent cold requests into one upstream call', async () => {
+    const slow = await startUpstreamStub((_request, response) => {
+      setTimeout(() => {
+        response.writeHead(200, { 'content-type': 'application/json' });
+        response.end(JSON.stringify(detailFixture));
+      }, 100);
+    });
+    const previousBaseUrl = process.env.PHIMAPI_BASE_URL;
+    process.env.PHIMAPI_BASE_URL = slow.baseUrl;
+    const slowApp = await createTestApp();
+    await slowApp.listen(0);
+    try {
+      const responses = await Promise.all(
+        Array.from({ length: 5 }, () =>
+          request(slowApp.getHttpServer()).get('/api/compat/phim/concurrent')
+        )
+      );
+
+      for (const response of responses) {
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual(detailFixture);
+      }
+      expect(slow.requests).toHaveLength(1);
+    } finally {
+      await slowApp.close();
+      await slow.close();
+      process.env.PHIMAPI_BASE_URL = previousBaseUrl;
+    }
+  });
+
   it('marks a failed compat envelope as no-store', async () => {
     const failing = await startUpstreamStub((_request, response) => {
       response.writeHead(200, { 'content-type': 'application/json' });
