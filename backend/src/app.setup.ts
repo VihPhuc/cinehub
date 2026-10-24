@@ -1,10 +1,13 @@
 import type { INestApplication } from '@nestjs/common';
+import type { CorsOptions } from '@nestjs/common/interfaces/external/cors-options.interface';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import compression from 'compression';
 import helmet from 'helmet';
 import { ApiExceptionFilter } from './common/filters/api-exception.filter';
+import { isLoopbackOrigin } from './common/http/cors-origin';
+import { requestLoggingMiddleware } from './common/logging/request-logging.middleware';
 
 export function configureApp(app: INestApplication): void {
   const config = app.get(ConfigService);
@@ -15,18 +18,29 @@ export function configureApp(app: INestApplication): void {
   app.setGlobalPrefix('api');
   app.use(
     helmet({
+      // This service returns JSON; CSP is disabled to keep Swagger UI usable.
       contentSecurityPolicy: false,
       crossOriginResourcePolicy: { policy: 'cross-origin' },
     })
   );
   app.use(compression());
-  app.enableCors({
-    origin: config.getOrThrow<string[]>('cors.origins'),
+  app.use(requestLoggingMiddleware);
+  const allowedOrigins = config.getOrThrow<string[]>('cors.origins');
+  const allowLoopbackOrigins = config.getOrThrow<string>('nodeEnv') !== 'production';
+  const corsOptions: CorsOptions = {
+    origin: (origin, callback) => {
+      const allowed =
+        !origin ||
+        allowedOrigins.includes(origin) ||
+        (allowLoopbackOrigins && isLoopbackOrigin(origin));
+      callback(null, allowed);
+    },
     methods: ['GET', 'OPTIONS'],
     allowedHeaders: ['Content-Type'],
-    exposedHeaders: ['X-Cache'],
+    exposedHeaders: ['X-Cache', 'X-Request-Id'],
     maxAge: 86400,
-  });
+  };
+  app.enableCors(corsOptions);
   express.set('trust proxy', config.getOrThrow<boolean>('trustProxy') ? 1 : false);
 
   app.useGlobalPipes(

@@ -41,7 +41,7 @@ describe('PhimApiService', () => {
     expect(client.getJson).toHaveBeenCalledTimes(2);
   });
 
-  it('keeps status:true payloads cacheable', async () => {
+  it('keeps valid status:true list payloads cacheable', async () => {
     const client = fakeClient({ status: true, items: [{ slug: 'a' }] });
     const service = new PhimApiService(new MemoryCacheService(10), client);
 
@@ -49,5 +49,25 @@ describe('PhimApiService', () => {
     const second = await service.get('/danh-sach/phim-moi-cap-nhat', { page: 1 }, 1000);
 
     expect(second.cache).toBe('HIT');
+  });
+
+  it('does not cache a status:true list without an items array', async () => {
+    const client = fakeClient({ status: true, items: 'oops' });
+    const service = new PhimApiService(new MemoryCacheService(10), client);
+
+    await service.get('/danh-sach/phim-moi-cap-nhat', { page: 1 }, 1000);
+    await service.get('/danh-sach/phim-moi-cap-nhat', { page: 1 }, 1000);
+
+    expect(client.getJson).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not cache a status:true detail without a movie object', async () => {
+    const client = fakeClient({ status: true });
+    const service = new PhimApiService(new MemoryCacheService(10), client);
+
+    await service.get('/phim/phim-test', {}, 1000);
+    await service.get('/phim/phim-test', {}, 1000);
+
+    expect(client.getJson).toHaveBeenCalledTimes(2);
   });
 });

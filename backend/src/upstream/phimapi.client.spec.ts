@@ -68,6 +68,24 @@ describe('PhimApiClient', () => {
     expect(fetchFn).toHaveBeenCalledTimes(2);
   });
 
+  it('honors an HTTP-date Retry-After header', async () => {
+    const retryAt = new Date(Date.now() + 2000).toUTCString();
+    const fetchFn = jest
+      .fn()
+      .mockResolvedValueOnce(
+        new Response('{}', { status: 429, headers: { 'retry-after': retryAt } })
+      )
+      .mockResolvedValueOnce(jsonResponse({ status: true, items: [] }));
+    const client = new PhimApiClient(config(), fetchFn as typeof fetch);
+    const sleep = jest
+      .spyOn(client as unknown as { sleep: (ms: number) => Promise<void> }, 'sleep')
+      .mockResolvedValue(undefined);
+
+    await client.getJson('/danh-sach/phim-moi-cap-nhat', { page: 1 });
+
+    expect(sleep.mock.calls[0][0]).toBeGreaterThan(500);
+  });
+
   it('maps malformed JSON to BAD_RESPONSE without retrying', async () => {
     const fetchFn = jest.fn(async () => new Response('not-json', { status: 200 }));
     const client = new PhimApiClient(config(), fetchFn as typeof fetch);
@@ -103,6 +121,41 @@ describe('PhimApiClient', () => {
     await expect(client.getJson('/large', {})).rejects.toMatchObject({
       code: 'BAD_RESPONSE',
     });
+  });
+
+  it('stops reading a chunked response once the byte limit is crossed', async () => {
+    let canceled = false;
+    let pulls = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulls += 1;
+        if (pulls > 20) {
+          controller.close();
+          return;
+        }
+        controller.enqueue(new Uint8Array(64));
+      },
+      cancel() {
+        canceled = true;
+      },
+    });
+    const fetchFn = jest.fn(
+      async () =>
+        new Response(body, {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+    );
+    const client = new PhimApiClient(
+      config({ 'upstream.maxBytes': 100 }),
+      fetchFn as typeof fetch
+    );
+
+    await expect(client.getJson('/large', {})).rejects.toMatchObject({
+      code: 'BAD_RESPONSE',
+    });
+    expect(canceled).toBe(true);
+    expect(pulls).toBeLessThan(5);
   });
 
   it('rejects a path with traversal characters', async () => {

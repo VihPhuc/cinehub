@@ -1,6 +1,10 @@
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { startUpstreamStub, type UpstreamStub } from './upstream-stub';
+import {
+  detailFixture,
+  startUpstreamStub,
+  type UpstreamStub,
+} from './upstream-stub';
 import { createTestApp } from './create-test-app';
 
 describe('Normalized detail API', () => {
@@ -80,5 +84,33 @@ describe('Normalized detail API', () => {
       message: 'Movie not found',
       path: '/api/v1/movies/missing',
     });
+  });
+
+  it('returns 502 for a malformed detail and recovers after the upstream is fixed', async () => {
+    let malformed = true;
+    const flaky = await startUpstreamStub((_request, response) => {
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(JSON.stringify(malformed ? { status: true } : detailFixture));
+    });
+    const previousBaseUrl = process.env.PHIMAPI_BASE_URL;
+    process.env.PHIMAPI_BASE_URL = flaky.baseUrl;
+    const flakyApp = await createTestApp();
+    try {
+      const broken = await request(flakyApp.getHttpServer())
+        .get('/api/v1/movies/phim-test')
+        .expect(502);
+      expect(broken.body.message).toBe('Upstream unavailable');
+
+      malformed = false;
+      const recovered = await request(flakyApp.getHttpServer())
+        .get('/api/v1/movies/phim-test')
+        .expect(200);
+      expect(recovered.body.movie.slug).toBe('phim-test');
+      expect(flaky.requests).toHaveLength(2);
+    } finally {
+      await flakyApp.close();
+      await flaky.close();
+      process.env.PHIMAPI_BASE_URL = previousBaseUrl;
+    }
   });
 });

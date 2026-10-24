@@ -60,6 +60,57 @@ describe('Compat API', () => {
     ).toHaveLength(before + 1);
   });
 
+  it('marks a failed compat envelope as no-store', async () => {
+    const failing = await startUpstreamStub((_request, response) => {
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(JSON.stringify({ status: false, msg: 'maintenance' }));
+    });
+    const previousBaseUrl = process.env.PHIMAPI_BASE_URL;
+    process.env.PHIMAPI_BASE_URL = failing.baseUrl;
+    const failingApp = await createTestApp();
+    try {
+      const response = await request(failingApp.getHttpServer())
+        .get('/api/compat/danh-sach/phim-moi-cap-nhat?page=1')
+        .expect(200);
+      expect(response.body).toEqual({ status: false, msg: 'maintenance' });
+      expect(response.headers['cache-control']).toBe('no-store');
+    } finally {
+      await failingApp.close();
+      await failing.close();
+      process.env.PHIMAPI_BASE_URL = previousBaseUrl;
+    }
+  });
+
+  it('does not cache a malformed upstream list', async () => {
+    let malformed = true;
+    const flaky = await startUpstreamStub((_request, response) => {
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(
+        JSON.stringify(malformed ? { status: true, items: 'oops' } : newUpdatedFixture)
+      );
+    });
+    const previousBaseUrl = process.env.PHIMAPI_BASE_URL;
+    process.env.PHIMAPI_BASE_URL = flaky.baseUrl;
+    const flakyApp = await createTestApp();
+    try {
+      const first = await request(flakyApp.getHttpServer())
+        .get('/api/compat/danh-sach/phim-moi-cap-nhat?page=1')
+        .expect(200);
+      expect(first.body).toEqual({ status: true, items: 'oops' });
+
+      malformed = false;
+      const recovered = await request(flakyApp.getHttpServer())
+        .get('/api/compat/danh-sach/phim-moi-cap-nhat?page=1')
+        .expect(200);
+      expect(recovered.body).toEqual(newUpdatedFixture);
+      expect(flaky.requests).toHaveLength(2);
+    } finally {
+      await flakyApp.close();
+      await flaky.close();
+      process.env.PHIMAPI_BASE_URL = previousBaseUrl;
+    }
+  });
+
   it('returns 400 for invalid page, type, and slug', async () => {
     await request(app.getHttpServer()).get('/api/compat/danh-sach/phim-moi-cap-nhat?page=0').expect(400);
     await request(app.getHttpServer()).get('/api/compat/v1/api/danh-sach/unknown?page=1').expect(400);
@@ -72,5 +123,6 @@ describe('Compat API', () => {
       statusCode: 404,
       path: '/api/unknown',
     });
+    expect(response.headers['cache-control']).toBe('no-store');
   });
 });

@@ -25,6 +25,22 @@ function ensureListResponse(raw: UpstreamListResponse): void {
   if (!raw || typeof raw !== 'object' || raw.status === false) {
     throw new UpstreamError('BAD_RESPONSE', 'Upstream returned an invalid list payload');
   }
+  const items = Array.isArray(raw.items) ? raw.items : raw.data?.items;
+  if (!Array.isArray(items)) {
+    throw new UpstreamError('BAD_RESPONSE', 'Upstream returned an invalid list payload');
+  }
+}
+
+function ensureDetailResponse(raw: UpstreamDetailResponse): void {
+  if (!raw || typeof raw !== 'object') {
+    throw new UpstreamError('BAD_RESPONSE', 'Upstream returned an invalid detail payload');
+  }
+  if (raw.status === false) {
+    throw new UpstreamError('NOT_FOUND', 'Movie not found');
+  }
+  if (!raw.movie || typeof raw.movie !== 'object' || Array.isArray(raw.movie)) {
+    throw new UpstreamError('BAD_RESPONSE', 'Upstream returned an invalid detail payload');
+  }
 }
 
 @Injectable()
@@ -41,7 +57,10 @@ export class MoviesService {
       ttlFor(this.config, 'new')
     );
     ensureListResponse(raw.value);
-    return { result: mapListResponse(raw.value), cache: raw.cache };
+    return {
+      result: mapListResponse(raw.value, { includeTitle: false }),
+      cache: raw.cache,
+    };
   }
 
   async getCatalog(type: string, page: number): Promise<MovieListResult> {
@@ -81,7 +100,10 @@ export class MoviesService {
       ttlFor(this.config, 'search')
     );
     ensureListResponse(raw.value);
-    return { result: mapListResponse(raw.value), cache: raw.cache };
+    return {
+      result: mapListResponse(raw.value, { includeTitle: false }),
+      cache: raw.cache,
+    };
   }
 
   async getDetail(slug: string): Promise<MovieDetailResult> {
@@ -90,6 +112,7 @@ export class MoviesService {
       {},
       ttlFor(this.config, 'detail')
     );
+    ensureDetailResponse(raw.value);
     const movie = mapMovieDetail(raw.value);
     if (!movie) {
       throw new UpstreamError('NOT_FOUND', 'Movie not found');

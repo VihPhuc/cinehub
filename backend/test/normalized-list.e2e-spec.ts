@@ -1,6 +1,10 @@
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { startUpstreamStub, type UpstreamStub } from './upstream-stub';
+import {
+  newUpdatedFixture,
+  startUpstreamStub,
+  type UpstreamStub,
+} from './upstream-stub';
 import { createTestApp } from './create-test-app';
 
 describe('Normalized list API', () => {
@@ -73,6 +77,7 @@ describe('Normalized list API', () => {
 
     expect(response.body.items[0].slug).toBe('phim-test');
     expect(response.body.pagination.totalItems).toBe(1);
+    expect(response.body).not.toHaveProperty('title');
   });
 
   it('uses cache on the second identical list request', async () => {
@@ -119,6 +124,33 @@ describe('Normalized list API', () => {
     } finally {
       await failingApp.close();
       await failing.close();
+      process.env.PHIMAPI_BASE_URL = previousBaseUrl;
+    }
+  });
+
+  it('does not cache a malformed list and recovers after the upstream is fixed', async () => {
+    let malformed = true;
+    const flaky = await startUpstreamStub((_request, response) => {
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(
+        JSON.stringify(malformed ? { status: true, items: 'oops' } : newUpdatedFixture)
+      );
+    });
+    const previousBaseUrl = process.env.PHIMAPI_BASE_URL;
+    process.env.PHIMAPI_BASE_URL = flaky.baseUrl;
+    const flakyApp = await createTestApp();
+    try {
+      await request(flakyApp.getHttpServer()).get('/api/v1/movies/new?page=1').expect(502);
+
+      malformed = false;
+      const recovered = await request(flakyApp.getHttpServer())
+        .get('/api/v1/movies/new?page=1')
+        .expect(200);
+      expect(recovered.body.items).toHaveLength(1);
+      expect(flaky.requests).toHaveLength(2);
+    } finally {
+      await flakyApp.close();
+      await flaky.close();
       process.env.PHIMAPI_BASE_URL = previousBaseUrl;
     }
   });

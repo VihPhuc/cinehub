@@ -3,8 +3,15 @@ import Joi from 'joi';
 export const envValidationSchema = Joi.object({
   NODE_ENV: Joi.string().valid('development', 'test', 'production').default('development'),
   PORT: Joi.number().port().default(3001),
-  HOST: Joi.string().default('0.0.0.0'),
-  PHIMAPI_BASE_URL: Joi.string().uri({ scheme: ['http', 'https'] }).default('https://phimapi.com'),
+  HOST: Joi.string().default('::'),
+  PHIMAPI_BASE_URL: Joi.string()
+    .uri({ scheme: ['http', 'https'] })
+    .default('https://phimapi.com')
+    .when('NODE_ENV', {
+      is: 'production',
+      // oxlint-disable-next-line unicorn/no-thenable -- Joi's conditional keyword
+      then: Joi.string().uri({ scheme: ['https'] }).required(),
+    }),
   CORS_ORIGINS: Joi.string().default('http://localhost:5173,http://localhost:4173'),
   CACHE_MAX_ENTRIES: Joi.number().integer().min(1).default(500),
   CACHE_TTL_LIST_MS: Joi.number().integer().min(1000).default(240000),

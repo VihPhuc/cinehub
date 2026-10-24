@@ -1,4 +1,4 @@
-import type { INestApplication } from '@nestjs/common';
+import { Logger, type INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { startUpstreamStub, type UpstreamStub } from './upstream-stub';
 import { createTestApp } from './create-test-app';
@@ -30,6 +30,20 @@ describe('Security and operations API', () => {
     expect(response.headers['access-control-allow-origin']).toBe('http://localhost:5173');
   });
 
+  it('allows loopback origins used by Vite', async () => {
+    for (const origin of [
+      'http://127.0.0.1:5173',
+      'http://[::1]:5173',
+      'http://localhost:5174',
+    ]) {
+      const response = await request(app.getHttpServer())
+        .get('/api/health')
+        .set('Origin', origin)
+        .expect(200);
+      expect(response.headers['access-control-allow-origin']).toBe(origin);
+    }
+  });
+
   it('answers a CORS preflight', async () => {
     const response = await request(app.getHttpServer())
       .options('/api/health')
@@ -52,6 +66,29 @@ describe('Security and operations API', () => {
       .set('Origin', 'http://localhost:5173')
       .expect(200);
     expect(response.headers['access-control-expose-headers']).toContain('X-Cache');
+  });
+
+  it('logs request metadata without leaking search keywords', async () => {
+    const logSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation();
+    try {
+      const response = await request(app.getHttpServer())
+        .get('/api/v1/search?q=secret-keyword&page=1')
+        .set('X-Request-Id', 'req-123')
+        .expect(200);
+
+      expect(response.headers['x-request-id']).toBe('req-123');
+      const line = logSpy.mock.calls
+        .map((call) => String(call[0]))
+        .find((entry) => entry.includes('method=GET'));
+      expect(line).toBeDefined();
+      expect(line).toContain('path=/api/v1/search');
+      expect(line).toContain('status=200');
+      expect(line).toContain('cache=MISS');
+      expect(line).toContain('requestId=req-123');
+      expect(line).not.toContain('secret-keyword');
+    } finally {
+      logSpy.mockRestore();
+    }
   });
 
   it('serves Swagger when enabled', async () => {
@@ -89,6 +126,30 @@ describe('Security and operations API', () => {
     try {
       await request(limitedApp.getHttpServer()).get('/api/health').expect(200);
       await request(limitedApp.getHttpServer()).get('/api/health').expect(200);
+      const limited = await request(limitedApp.getHttpServer())
+        .get('/api/health')
+        .expect(429);
+      expect(limited.body).toMatchObject({
+        statusCode: 429,
+        error: 'Too Many Requests',
+        message: 'Too Many Requests',
+      });
+      expect(limited.headers['cache-control']).toBe('no-store');
+      expect(limited.headers['retry-after']).toBeDefined();
+    } finally {
+      await limitedApp.close();
+      if (previousLimit === undefined) delete process.env.RATE_LIMIT_LIMIT;
+      else process.env.RATE_LIMIT_LIMIT = previousLimit;
+    }
+  });
+
+  it('shares one rate-limit bucket across routes for the same client', async () => {
+    const previousLimit = process.env.RATE_LIMIT_LIMIT;
+    process.env.RATE_LIMIT_LIMIT = '2';
+    const limitedApp = await createTestApp();
+    try {
+      await request(limitedApp.getHttpServer()).get('/api/health').expect(200);
+      await request(limitedApp.getHttpServer()).get('/api/v1/movies/new?page=1').expect(200);
       await request(limitedApp.getHttpServer()).get('/api/health').expect(429);
     } finally {
       await limitedApp.close();

@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { UpstreamError } from './upstream.errors';
 
@@ -7,6 +7,8 @@ export type UpstreamQuery = Record<string, string | number | boolean | undefined
 
 @Injectable()
 export class PhimApiClient {
+  private readonly logger = new Logger(PhimApiClient.name);
+
   constructor(
     private readonly config: ConfigService,
     @Inject(UPSTREAM_FETCH) private readonly fetchFn: typeof fetch
@@ -57,14 +59,14 @@ export class PhimApiClient {
         if (response.status === 429) {
           const retryAfter = this.retryAfter(response);
           if (attempt < retries) {
-            await this.sleep(Math.min(retryAfter ?? 250, 2000));
+            await this.sleep(Math.min((retryAfter ?? 0.25) * 1000, 2000));
             continue;
           }
           throw new UpstreamError('RATE_LIMIT', 'Upstream rate limit', retryAfter);
         }
         if (response.status >= 500) {
           if (attempt < retries) {
-            await this.sleep(250);
+            await this.sleep(this.backoff());
             continue;
           }
           throw new UpstreamError('UNAVAILABLE', 'Upstream server error');
@@ -77,10 +79,27 @@ export class PhimApiClient {
         if (contentLength > maxBytes) {
           throw new UpstreamError('BAD_RESPONSE', 'Upstream response too large');
         }
-        const buffer = Buffer.from(await response.arrayBuffer());
-        if (buffer.byteLength > maxBytes) {
-          throw new UpstreamError('BAD_RESPONSE', 'Upstream response too large');
+        if (!response.body) {
+          throw new UpstreamError('BAD_RESPONSE', 'Upstream returned an empty body');
         }
+        const reader = response.body.getReader();
+        const chunks: Uint8Array[] = [];
+        let totalBytes = 0;
+        try {
+          for (;;) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            totalBytes += value.byteLength;
+            if (totalBytes > maxBytes) {
+              await reader.cancel();
+              throw new UpstreamError('BAD_RESPONSE', 'Upstream response too large');
+            }
+            chunks.push(value);
+          }
+        } finally {
+          reader.releaseLock();
+        }
+        const buffer = Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)));
 
         try {
           return JSON.parse(buffer.toString('utf8')) as T;
@@ -90,6 +109,7 @@ export class PhimApiClient {
       } catch (error) {
         if (error instanceof UpstreamError) {
           if (error.code === 'BAD_RESPONSE' || error.code === 'NOT_FOUND') {
+            this.logFailure(path, error);
             throw error;
           }
           lastError = error;
@@ -100,15 +120,20 @@ export class PhimApiClient {
         }
 
         if (attempt >= retries) {
+          this.logFailure(path, lastError);
           throw lastError;
         }
-        await this.sleep(250);
+        await this.sleep(this.backoff());
       } finally {
         clearTimeout(timer);
       }
     }
 
     throw lastError ?? new UpstreamError('UNAVAILABLE', 'Upstream unavailable');
+  }
+
+  private logFailure(path: string, error: UpstreamError): void {
+    this.logger.warn(`upstream failure path=${path} code=${error.code}`);
   }
 
   private buildUrl(path: string, query: UpstreamQuery): string {
@@ -125,7 +150,14 @@ export class PhimApiClient {
     const raw = response.headers.get('retry-after');
     if (!raw) return undefined;
     const seconds = Number(raw);
-    return Number.isFinite(seconds) && seconds >= 0 ? seconds : undefined;
+    if (Number.isFinite(seconds) && seconds >= 0) return seconds;
+    const timestamp = Date.parse(raw);
+    if (!Number.isFinite(timestamp)) return undefined;
+    return Math.max(0, Math.ceil((timestamp - Date.now()) / 1000));
+  }
+
+  private backoff(): number {
+    return 250 + Math.floor(Math.random() * 100);
   }
 
   private isAbortError(error: unknown): boolean {

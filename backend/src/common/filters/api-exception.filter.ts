@@ -40,7 +40,11 @@ export class ApiExceptionFilter implements ExceptionFilter {
         message = Array.isArray(record.message)
           ? record.message.join('; ')
           : String(record.message ?? exception.message);
-        error = String(record.error ?? exception.name);
+        error = String(record.error ?? this.errorForStatus(status));
+      }
+      if (status === HttpStatus.TOO_MANY_REQUESTS) {
+        message = 'Too Many Requests';
+        error = 'Too Many Requests';
       }
     } else {
       this.logger.error(
@@ -49,12 +53,24 @@ export class ApiExceptionFilter implements ExceptionFilter {
       );
     }
 
+    response.setHeader('Cache-Control', 'no-store');
+    response.setHeader('Vary', 'Origin');
     response.status(status).json({
       statusCode: status,
       error,
       message,
       path: request.originalUrl,
     });
+  }
+
+  private errorForStatus(status: number): string {
+    const name = HttpStatus[status] as string | undefined;
+    if (!name) return 'Error';
+    return name
+      .toLowerCase()
+      .split('_')
+      .map((word) => `${word.charAt(0).toUpperCase()}${word.slice(1)}`)
+      .join(' ');
   }
 
   private mapUpstream(exception: UpstreamError): {

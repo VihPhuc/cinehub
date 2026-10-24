@@ -124,13 +124,16 @@ function mapPagination(raw: UpstreamPagination | undefined): PaginationDto {
   };
 }
 
-export function mapListResponse(raw: UpstreamListResponse): MovieListDto {
+export function mapListResponse(
+  raw: UpstreamListResponse,
+  options: { includeTitle?: boolean } = {}
+): MovieListDto {
   const upstreamPagination = raw.pagination ?? raw.data?.params?.pagination;
-  const rawItems = raw.items ?? raw.data?.items ?? [];
+  const rawItems = Array.isArray(raw.items) ? raw.items : raw.data?.items ?? [];
   const items = rawItems
     .filter((item): item is UpstreamMovie => Boolean(item) && typeof item === 'object')
     .map(mapMovieSummary);
-  const title = text(raw.data?.titlePage);
+  const title = options.includeTitle === false ? undefined : text(raw.data?.titlePage);
 
   return {
     items,

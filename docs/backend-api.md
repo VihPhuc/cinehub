@@ -3,10 +3,14 @@
 ## Run
 
 ```bash
-cd backend
-npm ci
-npm run start:dev
+npm ci --prefix frontend
+npm ci --prefix backend
+npm run dev
 ```
+
+`npm run dev` starts the frontend on `http://localhost:5173` and the API on
+`http://localhost:3001`. Use `npm run dev:web` or `npm run dev:api` to run
+only one side.
 
 Base URL: `http://localhost:3001/api`
 
@@ -36,8 +40,10 @@ Existing paths are unchanged:
 | Detail | `/api/compat/phim/phim-test` |
 
 Compat responses are the raw PhimAPI JSON. No wrapper, no renamed fields.
-CORS defaults to `http://localhost:5173` and `http://localhost:4173`; set
-`CORS_ORIGINS` for other origins.
+CORS defaults to `http://localhost:5173` and `http://localhost:4173`. In
+development any loopback origin on any port is also allowed (`localhost`,
+`127.0.0.1`, `[::1]`). In production only the exact `CORS_ORIGINS` allowlist
+is accepted.
 
 ## Normalized API
 
@@ -94,19 +100,42 @@ Detail response:
 
 - 400: invalid query/path
 - 404: movie not found
+- 429: rate limit exceeded (see `Retry-After`)
 - 502: upstream invalid/unavailable
 - 503: upstream rate limit
 - 504: upstream timeout
 
+Error responses and failed compat envelopes always carry
+`Cache-Control: no-store`. `429` responses include `Retry-After` and use the
+same error shape with `error`/`message` set to `Too Many Requests`.
+
 Do not proxy HLS/iframe through the backend. Keep the current player and
 stream URLs unchanged.
 
-## Cache
+## Cache and logging
 
 - `X-Cache: HIT | MISS` is exposed for debugging.
+- `X-Request-Id` echoes a safe client ID or generates one; use it when
+  reporting an issue.
 - Cache TTL: new 2m, list 4m, search 1m, detail 6m.
-- `status:false`, errors, and malformed responses are never cached.
+- Only structurally valid successful payloads are cached. `status:false`,
+  malformed payloads, timeouts, and error responses are never cached.
 - Compat and normalized endpoints share the raw upstream cache.
+- Requests are logged with method, route, status, duration, cache status, and
+  request ID. Search keywords are not logged.
+
+## Troubleshooting red requests
+
+If DevTools shows API requests (and `favicon.svg`) with a red X:
+
+1. Confirm both servers are running with one command from the repo root:
+   `npm run dev`. Check `http://localhost:3001/api/health` and
+   `http://localhost:5173`.
+2. Open the page using an allowed origin. In development, loopback origins on
+   any port work; in production, set `CORS_ORIGINS` to the exact deployed
+   origin.
+3. If the app was previously offline, unregister the old service worker in
+   DevTools > Application > Service Workers, then hard-reload.
 
 ## Integration checklist
 

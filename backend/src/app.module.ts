@@ -1,10 +1,11 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { CacheModule } from './cache/cache.module';
 import { CompatModule } from './compat/compat.module';
 import configuration from './common/config/configuration';
+import { GlobalThrottlerGuard } from './common/guards/global-throttler.guard';
 import { envValidationSchema } from './common/config/env.validation';
 import { HealthModule } from './health/health.module';
 import { MoviesModule } from './movies/movies.module';
@@ -36,7 +37,7 @@ import { UpstreamModule } from './upstream/upstream.module';
   providers: [
     {
       provide: APP_GUARD,
-      useClass: ThrottlerGuard,
+      useClass: GlobalThrottlerGuard,
     },
   ],
 })

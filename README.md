@@ -27,7 +27,8 @@ Yêu cầu Node.js 22+ (khuyến nghị) và npm.
 ```bash
 npm ci --prefix frontend
 npm ci --prefix backend
-npm run dev           # http://localhost:5173
+npm run dev           # web http://localhost:5173 + API http://localhost:3001
+npm run dev:web       # chỉ frontend
 npm run dev:api       # NestJS API ở http://localhost:3001
 npm run build:web     # tsc -b + vite build -> frontend/dist/
 npm run preview
