@@ -15,7 +15,9 @@ only one side.
 Base URL: `http://localhost:3001/api`
 
 Swagger: `http://localhost:3001/api/docs` (enabled outside production by
-default; set `SWAGGER_ENABLED` to override).
+default; set `SWAGGER_ENABLED` to override). The OpenAPI document at
+`/api/docs-json` includes typed response schemas, query/path parameters, and
+the shared `400/404/429/502/503/504` error schema.
 
 ## Compat integration (anty)
 

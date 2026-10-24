@@ -95,6 +95,35 @@ describe('Security and operations API', () => {
     await request(app.getHttpServer()).get('/api/docs').expect(200);
   });
 
+  it('documents parameters, response schemas, and errors in Swagger', async () => {
+    const response = await request(app.getHttpServer()).get('/api/docs-json').expect(200);
+    const document = response.body;
+
+    expect(document.components.schemas.MovieListDto).toBeDefined();
+    expect(document.components.schemas.MovieDetailResultDto).toBeDefined();
+    expect(document.components.schemas.ApiErrorDto).toBeDefined();
+
+    const newMovies = document.paths['/api/v1/movies/new'].get;
+    expect(newMovies.parameters).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'page', in: 'query', required: false }),
+      ])
+    );
+    expect(newMovies.responses['200'].content['application/json'].schema.$ref).toContain(
+      'MovieListDto'
+    );
+    expect(newMovies.responses['429'].content['application/json'].schema.$ref).toContain(
+      'ApiErrorDto'
+    );
+
+    const compatDetail = document.paths['/api/compat/phim/{slug}'].get;
+    expect(compatDetail.parameters).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'slug', in: 'path', required: true }),
+      ])
+    );
+  });
+
   it('returns 502 for a persistent upstream failure', async () => {
     const failing = await startUpstreamStub((_request, response) => {
       response.writeHead(500, { 'content-type': 'application/json' });

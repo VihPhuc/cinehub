@@ -1,73 +1,160 @@
-export interface MovieNamedDto {
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
+export class MovieNamedDto {
+  @ApiPropertyOptional()
   id?: string;
-  name: string;
-  slug: string;
+
+  @ApiProperty()
+  name!: string;
+
+  @ApiProperty()
+  slug!: string;
 }
 
-export interface MovieTmdbDto {
+export class MovieTmdbDto {
+  @ApiPropertyOptional({ oneOf: [{ type: 'string' }, { type: 'number' }], nullable: true })
   id?: string | number | null;
+
+  @ApiPropertyOptional({ nullable: true })
   type?: string | null;
+
+  @ApiPropertyOptional({ type: Number, nullable: true })
   season?: number | null;
+
+  @ApiPropertyOptional({ type: Number })
   vote_average?: number;
+
+  @ApiPropertyOptional({ type: Number })
   vote_count?: number;
 }
 
-export interface MovieSummaryDto {
+export class MovieSummaryDto {
+  @ApiPropertyOptional()
   _id?: string;
-  name: string;
-  slug: string;
+
+  @ApiProperty()
+  name!: string;
+
+  @ApiProperty()
+  slug!: string;
+
+  @ApiPropertyOptional()
   origin_name?: string;
+
+  @ApiPropertyOptional()
   thumb_url?: string;
+
+  @ApiPropertyOptional()
   poster_url?: string;
+
+  @ApiPropertyOptional({ type: Number })
   year?: number;
+
+  @ApiPropertyOptional()
   time?: string;
+
+  @ApiPropertyOptional()
   episode_current?: string;
+
+  @ApiPropertyOptional()
   quality?: string;
+
+  @ApiPropertyOptional()
   lang?: string;
+
+  @ApiPropertyOptional()
   chieurap?: boolean;
+
+  @ApiPropertyOptional({ type: () => MovieTmdbDto })
   tmdb?: MovieTmdbDto;
+
+  @ApiPropertyOptional({ type: () => MovieNamedDto, isArray: true })
   category?: MovieNamedDto[];
+
+  @ApiPropertyOptional({ type: () => MovieNamedDto, isArray: true })
   country?: MovieNamedDto[];
 }
 
-export interface EpisodeDto {
-  name: string;
-  slug: string;
+export class EpisodeDto {
+  @ApiProperty()
+  name!: string;
+
+  @ApiProperty()
+  slug!: string;
+
+  @ApiPropertyOptional()
   filename?: string;
-  link_embed: string;
-  link_m3u8: string;
+
+  @ApiProperty()
+  link_embed!: string;
+
+  @ApiProperty()
+  link_m3u8!: string;
 }
 
-export interface EpisodeServerDto {
-  server_name: string;
-  server_data: EpisodeDto[];
+export class EpisodeServerDto {
+  @ApiProperty()
+  server_name!: string;
+
+  @ApiProperty({ type: () => EpisodeDto, isArray: true })
+  server_data!: EpisodeDto[];
 }
 
-export interface MovieDetailDto extends MovieSummaryDto {
+export class MovieDetailDto extends MovieSummaryDto {
+  @ApiPropertyOptional()
   content?: string;
+
+  @ApiPropertyOptional()
   type?: string;
+
+  @ApiPropertyOptional()
   status?: string;
+
+  @ApiPropertyOptional()
   trailer_url?: string;
+
+  @ApiPropertyOptional({ oneOf: [{ type: 'string' }, { type: 'number' }] })
   episode_total?: string | number;
+
+  @ApiPropertyOptional({ type: Number })
   view?: number;
+
+  @ApiPropertyOptional({ type: String, isArray: true })
   actor?: string[];
+
+  @ApiPropertyOptional({ type: String, isArray: true })
   director?: string[];
+
+  @ApiPropertyOptional({ type: () => EpisodeServerDto, isArray: true })
   episodes?: EpisodeServerDto[];
 }
 
-export interface PaginationDto {
-  page: number;
-  totalPages: number;
-  totalItems: number;
-  totalItemsPerPage: number;
+export class PaginationDto {
+  @ApiProperty({ type: Number })
+  page!: number;
+
+  @ApiProperty({ type: Number })
+  totalPages!: number;
+
+  @ApiProperty({ type: Number })
+  totalItems!: number;
+
+  @ApiProperty({ type: Number })
+  totalItemsPerPage!: number;
 }
 
-export interface MovieListDto {
-  items: MovieSummaryDto[];
+export class MovieListDto {
+  @ApiProperty({ type: () => MovieSummaryDto, isArray: true })
+  items!: MovieSummaryDto[];
+
+  @ApiPropertyOptional()
   title?: string;
-  pagination: PaginationDto;
+
+  @ApiProperty({ type: () => PaginationDto })
+  pagination!: PaginationDto;
 }
 
-export interface MovieDetailResultDto {
-  movie: MovieDetailDto;
+export class MovieDetailResultDto {
+  @ApiProperty({ type: () => MovieDetailDto })
+  movie!: MovieDetailDto;
 }
