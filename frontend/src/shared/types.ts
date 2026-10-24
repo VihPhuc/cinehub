@@ -34,6 +34,8 @@ export interface MovieItem {
   tmdb?: MovieTMDB;
   category?: MovieCategory[];
   country?: MovieCountry[];
+  updatedAt?: string;
+  modified?: { time?: string };
 }
 
 export interface EpisodeItem {

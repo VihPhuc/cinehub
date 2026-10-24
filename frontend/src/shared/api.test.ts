@@ -544,4 +544,127 @@ describe('api normalized v1 endpoints', () => {
   });
 });
 
+describe('sanitizeMovieItem updatedAt mapping', () => {
+  it('maps normalized updatedAt, compat modified.time, and drops invalid dates', async () => {
+    const { sanitizeMovieItem } = await import('./api');
+
+    const normalized = sanitizeMovieItem({
+      slug: 'norm-movie',
+      name: 'Phim Chuẩn',
+      updatedAt: '2026-10-24T15:28:29.000Z',
+    });
+    expect(normalized.updatedAt).toBe('2026-10-24T15:28:29.000Z');
+
+    const compat = sanitizeMovieItem({
+      slug: 'compat-movie',
+      name: 'Phim Compat',
+      modified: { time: '2026-10-24T12:00:00.000Z' },
+    });
+    expect(compat.updatedAt).toBe('2026-10-24T12:00:00.000Z');
+
+    const invalid = sanitizeMovieItem({
+      slug: 'invalid-movie',
+      name: 'Phim Lỗi Date',
+      updatedAt: 'not-a-valid-date',
+      modified: { time: 'gibberish' },
+    });
+    expect(invalid.updatedAt).toBeUndefined();
+
+    const missing = sanitizeMovieItem({
+      slug: 'missing-movie',
+      name: 'Phim Không Date',
+    });
+    expect(missing.updatedAt).toBeUndefined();
+  });
+});
+
+describe('sortMoviesByUpdatedAtDesc', () => {
+  it('stably sorts movies with timestamps descending and places missing timestamps at the end', async () => {
+    const { sortMoviesByUpdatedAtDesc } = await import('./api');
+
+    const mOld = { slug: 'old', name: 'Old', updatedAt: '2026-10-20T10:00:00.000Z' };
+    const mMid = { slug: 'mid', name: 'Mid', updatedAt: '2026-10-22T10:00:00.000Z' };
+    const mNew = { slug: 'new', name: 'New', updatedAt: '2026-10-24T10:00:00.000Z' };
+    const mNoTime1 = { slug: 'no-time-1', name: 'No Time 1' };
+    const mNoTime2 = { slug: 'no-time-2', name: 'No Time 2' };
+
+    const shuffled = [mOld, mNoTime1, mNew, mNoTime2, mMid];
+    const sorted = sortMoviesByUpdatedAtDesc(shuffled);
+
+    expect(sorted.map((m) => m.slug)).toEqual([
+      'new',
+      'mid',
+      'old',
+      'no-time-1',
+      'no-time-2',
+    ]);
+  });
+});
+
+describe('selectTopRatedMovies', () => {
+  it('filters by vote threshold, sorts by average and count, and enforces limit', async () => {
+    const { selectTopRatedMovies } = await import('./api');
+
+    const lowVotes = {
+      slug: 'low-votes',
+      name: 'Low Votes',
+      tmdb: { vote_average: 9.5, vote_count: 5 },
+    };
+    const goodRating = {
+      slug: 'good',
+      name: 'Good',
+      tmdb: { vote_average: 8.2, vote_count: 50 },
+    };
+    const topRating = {
+      slug: 'top',
+      name: 'Top',
+      tmdb: { vote_average: 8.9, vote_count: 100 },
+    };
+    const tiedRatingHighVotes = {
+      slug: 'tied-high',
+      name: 'Tied High',
+      tmdb: { vote_average: 8.2, vote_count: 150 },
+    };
+    const noRating = {
+      slug: 'no-rating',
+      name: 'No Rating',
+    };
+
+    const movies = [lowVotes, goodRating, noRating, topRating, tiedRatingHighVotes];
+    const selected = selectTopRatedMovies(movies, 10, 20);
+
+    expect(selected.map((m) => m.slug)).toEqual([
+      'top',
+      'tied-high',
+      'good',
+    ]);
+
+    // Respects limit
+    const limited = selectTopRatedMovies(movies, 2, 20);
+    expect(limited.map((m) => m.slug)).toEqual(['top', 'tied-high']);
+  });
+});
+
+describe('api cache bypass', () => {
+  it('calls fetch with cache: "no-store" when bypassCache: true', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({
+        status: true,
+        items: [{ slug: 'bypassed', name: 'Bypassed Movie' }],
+        pagination: { totalPages: 1 },
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { getNewUpdatedMovies } = await import('./api');
+    const res = await getNewUpdatedMovies(1, { bypassCache: true });
+
+    expect(res.items[0].slug).toBe('bypassed');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const fetchInit = fetchMock.mock.calls[0][1];
+    expect(fetchInit).toMatchObject({ cache: 'no-store' });
+  });
+});
+
+
 

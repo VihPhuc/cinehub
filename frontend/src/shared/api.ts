@@ -69,11 +69,116 @@ export function formatMovieTitle(name?: string): string {
   return primary;
 }
 
+export interface RequestOptions {
+  bypassCache?: boolean;
+  signal?: AbortSignal;
+}
+
+export function normalizeRequestOptions(
+  optionsOrSignal?: RequestOptions | AbortSignal
+): RequestOptions {
+  if (!optionsOrSignal) return {};
+  if (optionsOrSignal instanceof AbortSignal || 'aborted' in optionsOrSignal) {
+    return { signal: optionsOrSignal as AbortSignal };
+  }
+  return optionsOrSignal as RequestOptions;
+}
+
 export function sanitizeMovieItem(item: MovieItem): MovieItem {
-  return {
+  const rawDate =
+    item.updatedAt ||
+    item.modified?.time ||
+    (typeof item.modified === 'string' ? item.modified : undefined);
+
+  let validUpdatedAt: string | undefined;
+  if (rawDate && typeof rawDate === 'string') {
+    const parsed = Date.parse(rawDate);
+    if (!Number.isNaN(parsed)) {
+      validUpdatedAt = new Date(parsed).toISOString();
+    }
+  }
+
+  const result: MovieItem = {
     ...item,
     name: formatMovieTitle(item.name),
   };
+
+  if (validUpdatedAt) {
+    result.updatedAt = validUpdatedAt;
+  } else {
+    delete result.updatedAt;
+  }
+
+  return result;
+}
+
+export function sortMoviesByUpdatedAtDesc(movies: MovieItem[]): MovieItem[] {
+  return movies
+    .map((item, index) => ({ item, index }))
+    .sort((a, b) => {
+      const timeA = a.item.updatedAt ? Date.parse(a.item.updatedAt) : NaN;
+      const timeB = b.item.updatedAt ? Date.parse(b.item.updatedAt) : NaN;
+      const hasA = !Number.isNaN(timeA);
+      const hasB = !Number.isNaN(timeB);
+
+      if (hasA && hasB) {
+        const diff = timeB - timeA;
+        if (diff !== 0) return diff;
+        return a.index - b.index;
+      }
+      if (hasA) return -1;
+      if (hasB) return 1;
+      return a.index - b.index;
+    })
+    .map(({ item }) => item);
+}
+
+export function selectTopRatedMovies(
+  movies: MovieItem[],
+  limit = 10,
+  minVotes = 20
+): MovieItem[] {
+  return movies
+    .map((item, index) => ({ item, index }))
+    .filter(
+      ({ item }) =>
+        (item.tmdb?.vote_count ?? 0) >= minVotes && (item.tmdb?.vote_average ?? 0) > 0
+    )
+    .sort((a, b) => {
+      const scoreA = a.item.tmdb?.vote_average ?? 0;
+      const scoreB = b.item.tmdb?.vote_average ?? 0;
+      if (scoreB !== scoreA) return scoreB - scoreA;
+
+      const votesA = a.item.tmdb?.vote_count ?? 0;
+      const votesB = b.item.tmdb?.vote_count ?? 0;
+      if (votesB !== votesA) return votesB - votesA;
+
+      return a.index - b.index;
+    })
+    .slice(0, limit)
+    .map(({ item }) => item);
+}
+
+export function formatUpdatedAtBadge(dateStr?: string): string {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return '';
+  const now = new Date();
+  const isToday =
+    d.getDate() === now.getDate() &&
+    d.getMonth() === now.getMonth() &&
+    d.getFullYear() === now.getFullYear();
+
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+
+  if (isToday) {
+    return `Cập nhật ${hh}:${mm}`;
+  }
+
+  const dd = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  return `${dd}/${month} ${hh}:${mm}`;
 }
 
 const CACHE_PREFIX = 'cinehub_api_';
@@ -107,12 +212,16 @@ function setSessionCache<T>(key: string, entry: CacheEntry<T>): void {
   }
 }
 
-async function fetchWithTimeout(url: string, timeoutMs: number): Promise<Response> {
+async function fetchWithTimeout(
+  url: string,
+  timeoutMs: number,
+  options?: RequestInit
+): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    return await fetch(url, { signal: controller.signal });
+    return await fetch(url, { ...options, signal: controller.signal });
   } finally {
     clearTimeout(timer);
   }
@@ -182,30 +291,36 @@ function trimMemoryCache(): void {
 async function fetchWithCache<T>(
   url: string,
   ttl: number = DEFAULT_TTL_MS,
-  externalSignal?: AbortSignal
+  optionsOrSignal?: RequestOptions | AbortSignal
 ): Promise<T | null> {
+  const options = normalizeRequestOptions(optionsOrSignal);
+  const { bypassCache = false, signal: externalSignal } = options;
   if (externalSignal?.aborted) return null;
 
   const now = Date.now();
 
-  const memCached = memoryCache.get(url) as CacheEntry<T> | undefined;
-  if (memCached && memCached.expiry > now) {
-    return memCached.data;
-  }
-  if (memCached) memoryCache.delete(url);
+  if (!bypassCache) {
+    const memCached = memoryCache.get(url) as CacheEntry<T> | undefined;
+    if (memCached && memCached.expiry > now) {
+      return memCached.data;
+    }
+    if (memCached) memoryCache.delete(url);
 
-  const sessionCached = getSessionCache<T>(url);
-  if (sessionCached && sessionCached.expiry > now) {
-    memoryCache.set(url, sessionCached as CacheEntry<unknown>);
-    return sessionCached.data;
+    const sessionCached = getSessionCache<T>(url);
+    if (sessionCached && sessionCached.expiry > now) {
+      memoryCache.set(url, sessionCached as CacheEntry<unknown>);
+      return sessionCached.data;
+    }
+    if (sessionCached) removeSessionCache(url);
   }
-  if (sessionCached) removeSessionCache(url);
 
-  let requestPromise = inFlightRequests.get(url) as Promise<T | null> | undefined;
+  const inFlightKey = bypassCache ? `${url}__bypass` : url;
+  let requestPromise = inFlightRequests.get(inFlightKey) as Promise<T | null> | undefined;
   if (!requestPromise) {
     requestPromise = (async (): Promise<T | null> => {
       try {
-        const res = await fetchWithTimeout(url, DEFAULT_TIMEOUT_MS);
+        const fetchInit: RequestInit = bypassCache ? { cache: 'no-store' } : {};
+        const res = await fetchWithTimeout(url, DEFAULT_TIMEOUT_MS, fetchInit);
         if (!res.ok) {
           return null;
         }
@@ -225,20 +340,24 @@ async function fetchWithCache<T>(
         console.warn(`[api] Fetch failed for ${url}:`, err);
         return null;
       } finally {
-        inFlightRequests.delete(url);
+        inFlightRequests.delete(inFlightKey);
       }
     })();
-    inFlightRequests.set(url, requestPromise);
+    inFlightRequests.set(inFlightKey, requestPromise);
   }
 
   return waitForSignal(requestPromise, externalSignal);
 }
 
-export async function getNewUpdatedMovies(page = 1): Promise<{ items: MovieItem[]; totalPages: number }> {
+export async function getNewUpdatedMovies(
+  page = 1,
+  optionsOrSignal?: RequestOptions | AbortSignal
+): Promise<{ items: MovieItem[]; totalPages: number }> {
   if (isV1Api()) {
     const data = await fetchWithCache<NormalizedListResponse>(
       `${getBaseUrl()}/movies/new?page=${page}`,
-      2 * 60 * 1000
+      2 * 60 * 1000,
+      optionsOrSignal
     );
     if (!data) return { items: [], totalPages: 1 };
     return {
@@ -249,7 +368,8 @@ export async function getNewUpdatedMovies(page = 1): Promise<{ items: MovieItem[
 
   const data = await fetchWithCache<NewUpdatedResponse>(
     `${getBaseUrl()}/danh-sach/phim-moi-cap-nhat?page=${page}`,
-    2 * 60 * 1000
+    2 * 60 * 1000,
+    optionsOrSignal
   );
   if (!data) return { items: [], totalPages: 1 };
   return {
@@ -261,13 +381,13 @@ export async function getNewUpdatedMovies(page = 1): Promise<{ items: MovieItem[
 export async function getCatalogMovies(
   type: 'phim-le' | 'phim-bo' | 'hoat-hinh' | 'tv-shows',
   page = 1,
-  signal?: AbortSignal
+  optionsOrSignal?: RequestOptions | AbortSignal
 ): Promise<{ items: MovieItem[]; title: string; totalPages: number }> {
   if (isV1Api()) {
     const data = await fetchWithCache<NormalizedListResponse>(
       `${getBaseUrl()}/movies?type=${type}&page=${page}`,
       undefined,
-      signal
+      optionsOrSignal
     );
     if (!data) return { items: [], title: '', totalPages: 1 };
     return {
@@ -280,7 +400,7 @@ export async function getCatalogMovies(
   const data = await fetchWithCache<CatalogResponse>(
     `${getBaseUrl()}/v1/api/danh-sach/${type}?page=${page}`,
     undefined,
-    signal
+    optionsOrSignal
   );
   if (!data) return { items: [], title: '', totalPages: 1 };
   return {
@@ -293,7 +413,7 @@ export async function getCatalogMovies(
 export async function getGenreMovies(
   slug: string,
   page = 1,
-  signal?: AbortSignal
+  optionsOrSignal?: RequestOptions | AbortSignal
 ): Promise<{ items: MovieItem[]; title: string; totalPages: number }> {
   const cleanSlug = encodeURIComponent(slug?.trim() || '');
   if (!cleanSlug) return { items: [], title: '', totalPages: 1 };
@@ -302,7 +422,7 @@ export async function getGenreMovies(
     const data = await fetchWithCache<NormalizedListResponse>(
       `${getBaseUrl()}/genres/${cleanSlug}/movies?page=${page}`,
       undefined,
-      signal
+      optionsOrSignal
     );
     if (!data) return { items: [], title: '', totalPages: 1 };
     return {
@@ -315,7 +435,7 @@ export async function getGenreMovies(
   const data = await fetchWithCache<CatalogResponse>(
     `${getBaseUrl()}/v1/api/the-loai/${cleanSlug}?page=${page}`,
     undefined,
-    signal
+    optionsOrSignal
   );
   if (!data) return { items: [], title: '', totalPages: 1 };
   return {
@@ -328,7 +448,7 @@ export async function getGenreMovies(
 export async function getCountryMovies(
   slug: string,
   page = 1,
-  signal?: AbortSignal
+  optionsOrSignal?: RequestOptions | AbortSignal
 ): Promise<{ items: MovieItem[]; title: string; totalPages: number }> {
   const cleanSlug = encodeURIComponent(slug?.trim() || '');
   if (!cleanSlug) return { items: [], title: '', totalPages: 1 };
@@ -337,7 +457,7 @@ export async function getCountryMovies(
     const data = await fetchWithCache<NormalizedListResponse>(
       `${getBaseUrl()}/countries/${cleanSlug}/movies?page=${page}`,
       undefined,
-      signal
+      optionsOrSignal
     );
     if (!data) return { items: [], title: '', totalPages: 1 };
     return {
@@ -350,7 +470,7 @@ export async function getCountryMovies(
   const data = await fetchWithCache<CatalogResponse>(
     `${getBaseUrl()}/v1/api/quoc-gia/${cleanSlug}?page=${page}`,
     undefined,
-    signal
+    optionsOrSignal
   );
   if (!data) return { items: [], title: '', totalPages: 1 };
   return {
@@ -363,7 +483,7 @@ export async function getCountryMovies(
 export async function searchMovies(
   keyword: string,
   page = 1,
-  signal?: AbortSignal
+  optionsOrSignal?: RequestOptions | AbortSignal
 ): Promise<{ items: MovieItem[]; totalPages: number }> {
   if (!keyword.trim()) return { items: [], totalPages: 1 };
 
@@ -371,7 +491,7 @@ export async function searchMovies(
     const data = await fetchWithCache<NormalizedListResponse>(
       `${getBaseUrl()}/search?q=${encodeURIComponent(keyword.trim())}&page=${page}`,
       60 * 1000,
-      signal
+      optionsOrSignal
     );
     if (!data) return { items: [], totalPages: 1 };
     return {
@@ -383,7 +503,7 @@ export async function searchMovies(
   const data = await fetchWithCache<CatalogResponse>(
     `${getBaseUrl()}/v1/api/tim-kiem?keyword=${encodeURIComponent(keyword.trim())}&page=${page}`,
     60 * 1000,
-    signal
+    optionsOrSignal
   );
   if (!data) return { items: [], totalPages: 1 };
   return {
@@ -427,7 +547,10 @@ function sanitizeEpisodes(raw: unknown): EpisodeServer[] {
   return servers;
 }
 
-export async function getMovieDetail(slug: string): Promise<MovieDetail | null> {
+export async function getMovieDetail(
+  slug: string,
+  optionsOrSignal?: RequestOptions | AbortSignal
+): Promise<MovieDetail | null> {
   const cleanSlug = encodeURIComponent(slug?.trim() || '');
   if (!cleanSlug) return null;
   try {
@@ -437,7 +560,8 @@ export async function getMovieDetail(slug: string): Promise<MovieDetail | null> 
     if (isV1Api()) {
       const data = await fetchWithCache<NormalizedDetailResponse>(
         `${getBaseUrl()}/movies/${cleanSlug}`,
-        6 * 60 * 1000
+        6 * 60 * 1000,
+        optionsOrSignal
       );
       if (!data || !data.movie) return null;
       rawMovie = data.movie;
@@ -445,7 +569,8 @@ export async function getMovieDetail(slug: string): Promise<MovieDetail | null> 
     } else {
       const data = await fetchWithCache<MovieDetailResponse>(
         `${getBaseUrl()}/phim/${cleanSlug}`,
-        6 * 60 * 1000
+        6 * 60 * 1000,
+        optionsOrSignal
       );
       if (!data || !data.status || !data.movie) return null;
       rawMovie = data.movie;

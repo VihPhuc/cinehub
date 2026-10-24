@@ -112,8 +112,8 @@ export const HeroBanner: React.FC<Props> = ({
 
   const countryName = activeDetail?.country?.[0]?.name || current.country?.[0]?.name;
   const topKicker = countryName
-    ? `PHIM ${countryName.toUpperCase()} HÀNG ĐẦU`
-    : 'PHIM ĐỀ XUẤT HÀNG ĐẦU';
+    ? `PHIM ${countryName.toUpperCase()} MỚI CẬP NHẬT`
+    : 'PHIM MỚI CẬP NHẬT';
 
   const episodeInfo =
     activeDetail?.episode_current ||

@@ -128,3 +128,39 @@ Kiểm tra thủ công bằng Chrome headless + CDP trên `vite preview`:
     - Đã ngăn chặn vòng lặp re-fetch trong `HeroBanner.tsx` bằng `attemptedSlugsRef` và memoize `heroBannerMovies`.
     - Toàn bộ **137/137 test pass** trên toàn dự án (67 web + 70 backend), lint clean, build web & api 100% pass.
 
+- **Frontend Recency, Accuracy & Auto-Refresh (`feat/frontend-recency-and-accuracy` - 2026-10-24):**
+  - **Types & Mapping:**
+    - `MovieItem`: thêm `updatedAt?: string` và compat fallback `modified?: { time?: string }`.
+    - `sanitizeMovieItem`: ánh xạ `updatedAt` từ trường normalized `item.updatedAt` hoặc compat `item.modified?.time`; validate date chặt chẽ với `Date.parse`, loại bỏ các giá trị không hợp lệ.
+  - **Helpers:**
+    - `sortMoviesByUpdatedAtDesc(movies)`: sắp xếp ổn định (stable sort) giảm dần theo `updatedAt`; các phim thiếu timestamp được đưa xuống cuối mà vẫn giữ nguyên thứ tự ban đầu từ API.
+    - `selectTopRatedMovies(movies, limit = 10, minVotes = 20)`: lọc theo điều kiện TMDB rating (`vote_count >= 20` và `vote_average > 0`), sắp xếp điểm cao nhất trước, tie-breaker theo lượt đánh giá.
+    - `formatUpdatedAtBadge(dateStr)`: định dạng badge thời gian cập nhật hiển thị gọn gàng (`Cập nhật HH:mm` nếu trong ngày, `DD/MM HH:mm` nếu ngày trước).
+  - **Loại bỏ tuyên bố "Thịnh Hành" không có căn cứ (Truthfulness & UX Recency):**
+    - Hero kicker: đổi thành `"PHIM MỚI CẬP NHẬT"` / `"PHIM {COUNTRY} MỚI CẬP NHẬT"`, loại bỏ hoàn toàn chữ `"HÀNG ĐẦU"`.
+    - Hàng TOP 10: đổi thành `"TOP 10 Được Đánh Giá Cao"` (subtitle `"Điểm TMDB cao nhất trong các phim vừa cập nhật"`). Nếu có ít hơn 5 phim đủ tiêu chuẩn rating thì ẩn hàng (không fallback về danh sách chưa rating dưới nhãn thịnh hành).
+    - Đổi tên các hàng và chip danh mục:
+      * `"Mới Cập Nhật Hôm Nay"` -> `"Mới Cập Nhật"` (subtitle: `"Phim và tập mới được cập nhật gần nhất"`).
+      * `"Phim Bộ Thịnh Hành"` -> `"Phim Bộ Mới Cập Nhật"` (cả chip khám phá và hàng phim).
+      * `"K-Drama: Phim Bộ Hàn Quốc Gây Sốt"` -> `"Phim Hàn Mới Cập Nhật"` (badge `"PHIM HÀN"`).
+      * `"Phim Lẻ Đỉnh Cao"` -> `"Phim Lẻ Mới Cập Nhật"` (badge `"PHIM LẺ"`).
+      * `"Siêu Phẩm Hành Động & Kịch Tính"` -> `"Hành Động Mới Cập Nhật"` (badge `"HÀNH ĐỘNG"`).
+  - **Hiển thị Badge `updatedAt`:**
+    - `MovieCard` và `MovieRow` nhận prop `showUpdatedAt?: boolean`.
+    - Hàng "Mới Cập Nhật" hiển thị badge thời gian ở góc poster không che episode badge hay poster; có `title` và `aria-label` đầy đủ cho a11y.
+    - Loại bỏ fallback `movie.year || '2026'`; nếu thiếu năm phát hành, hiển thị `"—"`.
+  - **Sắp xếp MovieGrid:**
+    - `SortKey` thêm `'updated-desc'` và đặt làm mặc định; tùy chọn `"Mới cập nhật"` liên kết với `'updated-desc'`; `"Năm phát hành mới nhất"` liên kết với `'year-desc'`.
+    - `resetFilters` trả về `'updated-desc'`.
+    - Thêm ghi chú rõ ràng về giới hạn sắp xếp client-side trong 24 phim/trang.
+  - **Cơ chế Refresh & Cache Bypass:**
+    - `loadHome(force)` dùng `Promise.allSettled`, có `homeLoadingRef` chống request trùng.
+    - Tự động kiểm tra làm mới khi tab quay lại (`visibilitychange` / `focus`) nếu lần tải trước cách > 60 giây.
+    - Hiển thị `"Cập nhật lúc HH:mm"` trên thanh khám phá kèm nút bấm `"Làm mới"` thủ công.
+    - `fetchWithCache` và các API getter hỗ trợ `options?: RequestOptions` với `bypassCache: true`, gửi request `cache: 'no-store'` và cập nhật bộ nhớ đệm khi có kết quả mới.
+    - Service Worker (`sw.js`): nhận diện `request.cache === 'no-store'` để bỏ qua đọc cache và fetch network; nâng cấp `API_CACHE` lên `cinehub-api-v4` và `SHELL_CACHE` lên `cinehub-shell-v6`.
+  - **Kiểm thử:**
+    - Toàn bộ **72/72 tests frontend** pass (thêm 5 test mới cho `sanitizeMovieItem`, `sortMoviesByUpdatedAtDesc`, `selectTopRatedMovies`, SW `no-store` cache bypass, và `getNewUpdatedMovies` bypassCache).
+    - `oxlint` 0 lỗi, TypeScript typecheck pass, Vite production build hoàn tất sạch sẽ.
+
+

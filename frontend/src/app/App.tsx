@@ -12,11 +12,13 @@ import {
   getMovieDetail,
   searchMovies,
   getImageUrl,
+  sortMoviesByUpdatedAtDesc,
+  selectTopRatedMovies,
 } from '@/shared/api';
 import type { MovieDetail, MovieItem, FavoriteItem, HistoryItem } from '@/shared/types';
 import { getFavorites, getHistory, toggleFavorite, clearHistory, removeHistoryItem, subscribeToStorage } from '@/shared/storage';
 import { buildUrlSearch, parseUrlState } from './urlState';
-import { ArrowUp, WifiOff, Play, Clock, ChevronRight, Trophy, Sparkles, Flame, Zap, Clapperboard, Tv } from 'lucide-react';
+import { ArrowUp, WifiOff, Play, Clock, ChevronRight, Trophy, Sparkles, Flame, Zap, Clapperboard, Tv, RefreshCw } from 'lucide-react';
 import { THEME_OPTIONS } from '@/shared/theme';
 import { Navbar } from '@/features/navigation/Navbar';
 import { HeroBanner } from '@/features/home/HeroBanner';
@@ -135,7 +137,7 @@ export function App() {
 
   const handleRandomMovie = () => {
     const pool = [
-      ...newUpdated,
+      ...latestMovies,
       ...singleMovies,
       ...seriesMovies,
       ...animeMovies,
@@ -274,15 +276,98 @@ export function App() {
     });
   }, []);
 
-  useEffect(() => {
-    getNewUpdatedMovies(1).then((res) => setNewUpdated(res.items));
-    getCatalogMovies('phim-le', 1).then((res) => setSingleMovies(res.items.slice(0, 18)));
-    getCatalogMovies('phim-bo', 1).then((res) => setSeriesMovies(res.items.slice(0, 18)));
-    getCatalogMovies('hoat-hinh', 1).then((res) => setAnimeMovies(res.items.slice(0, 18)));
-    getCatalogMovies('tv-shows', 1).then((res) => setTvShows(res.items.slice(0, 18)));
-    getCountryMovies('han-quoc', 1).then((res) => setKoreanMovies(res.items.slice(0, 18)));
-    getGenreMovies('hanh-dong', 1).then((res) => setActionMovies(res.items.slice(0, 18)));
+  const [lastHomeUpdatedAt, setLastHomeUpdatedAt] = useState<number | null>(null);
+  const [isHomeRefreshing, setIsHomeRefreshing] = useState(false);
+  const homeLoadingRef = useRef(false);
+  const lastHomeLoadTimeRef = useRef(0);
+
+  const loadHome = useCallback(async (force = false) => {
+    if (homeLoadingRef.current) return;
+    homeLoadingRef.current = true;
+    if (force) setIsHomeRefreshing(true);
+
+    const reqOpts = force ? { bypassCache: true } : undefined;
+
+    try {
+      const [
+        resNew,
+        resSingle,
+        resSeries,
+        resAnime,
+        resTv,
+        resKorean,
+        resAction,
+      ] = await Promise.allSettled([
+        getNewUpdatedMovies(1, reqOpts),
+        getCatalogMovies('phim-le', 1, reqOpts),
+        getCatalogMovies('phim-bo', 1, reqOpts),
+        getCatalogMovies('hoat-hinh', 1, reqOpts),
+        getCatalogMovies('tv-shows', 1, reqOpts),
+        getCountryMovies('han-quoc', 1, reqOpts),
+        getGenreMovies('hanh-dong', 1, reqOpts),
+      ]);
+
+      if (resNew.status === 'fulfilled' && resNew.value.items.length > 0) {
+        setNewUpdated(resNew.value.items);
+      }
+      if (resSingle.status === 'fulfilled' && resSingle.value.items.length > 0) {
+        setSingleMovies(resSingle.value.items.slice(0, 18));
+      }
+      if (resSeries.status === 'fulfilled' && resSeries.value.items.length > 0) {
+        setSeriesMovies(resSeries.value.items.slice(0, 18));
+      }
+      if (resAnime.status === 'fulfilled' && resAnime.value.items.length > 0) {
+        setAnimeMovies(resAnime.value.items.slice(0, 18));
+      }
+      if (resTv.status === 'fulfilled' && resTv.value.items.length > 0) {
+        setTvShows(resTv.value.items.slice(0, 18));
+      }
+      if (resKorean.status === 'fulfilled' && resKorean.value.items.length > 0) {
+        setKoreanMovies(resKorean.value.items.slice(0, 18));
+      }
+      if (resAction.status === 'fulfilled' && resAction.value.items.length > 0) {
+        setActionMovies(resAction.value.items.slice(0, 18));
+      }
+
+      const now = Date.now();
+      lastHomeLoadTimeRef.current = now;
+      setLastHomeUpdatedAt(now);
+    } finally {
+      homeLoadingRef.current = false;
+      setIsHomeRefreshing(false);
+    }
   }, []);
+
+  useEffect(() => {
+    loadHome(false);
+
+    const checkAndRefresh = () => {
+      if (document.visibilityState === 'visible') {
+        const elapsed = Date.now() - lastHomeLoadTimeRef.current;
+        if (elapsed > 60000) {
+          loadHome(true);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', checkAndRefresh);
+    window.addEventListener('focus', checkAndRefresh);
+
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        const elapsed = Date.now() - lastHomeLoadTimeRef.current;
+        if (elapsed >= 60000) {
+          loadHome(true);
+        }
+      }
+    }, 60000);
+
+    return () => {
+      document.removeEventListener('visibilitychange', checkAndRefresh);
+      window.removeEventListener('focus', checkAndRefresh);
+      clearInterval(interval);
+    };
+  }, [loadHome]);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -404,7 +489,14 @@ export function App() {
   };
 
   const favSlugs = useMemo(() => favorites.map((f) => f.slug), [favorites]);
-  const heroBannerMovies = useMemo(() => newUpdated.slice(0, 8), [newUpdated]);
+  const { latestMovies, heroBannerMovies, topRatedMovies } = useMemo(() => {
+    const latest = sortMoviesByUpdatedAtDesc(newUpdated);
+    return {
+      latestMovies: latest,
+      heroBannerMovies: latest.slice(0, 8),
+      topRatedMovies: selectTopRatedMovies(latest, 10, 20),
+    };
+  }, [newUpdated]);
 
   if (watchingMovie) {
     return (
@@ -494,30 +586,60 @@ export function App() {
               onToggleFav={handleToggleFav}
             />
 
-            {/* Quick Explore Category Chips */}
+            {/* Quick Explore Category Chips & Refresh Indicator */}
             <div className="w-full max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-2">
-              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-2">
-                <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider shrink-0 mr-1">
-                  Khám phá nhanh:
-                </span>
-                {[
-                  { id: 'phim-le', label: '🎬 Phim Lẻ Bom Tấn' },
-                  { id: 'phim-bo', label: '📺 Phim Bộ Thịnh Hành' },
-                  { id: 'hoat-hinh', label: '⚡ Anime / Hoạt Hình' },
-                  { id: 'tv-shows', label: '🎪 TV Shows' },
-                  { id: 'library', label: '⭐ Tủ Phim Của Bạn' },
-                ].map((chip) => (
-                  <button
-                    key={chip.id}
-                    onClick={() => {
-                      setActiveTab(chip.id);
-                      setCurrentPage(1);
-                    }}
-                    className="shrink-0 px-3.5 py-1.5 rounded-xl glass-pill hover:bg-white/15 text-xs font-semibold text-zinc-300 hover:text-white transition-all cursor-pointer border border-white/10 focus-visible:ring-2 focus-visible:ring-red-500"
-                  >
-                    {chip.label}
-                  </button>
-                ))}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2">
+                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+                  <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider shrink-0 mr-1">
+                    Khám phá:
+                  </span>
+                  {[
+                    { id: 'phim-le', label: '🎬 Phim Lẻ' },
+                    { id: 'phim-bo', label: '📺 Phim Bộ Mới Cập Nhật' },
+                    { id: 'hoat-hinh', label: '⚡ Anime' },
+                    { id: 'tv-shows', label: '🎪 TV Shows' },
+                    { id: 'library', label: '⭐ Tủ Phim' },
+                  ].map((chip) => (
+                    <button
+                      key={chip.id}
+                      onClick={() => {
+                        setActiveTab(chip.id);
+                        setCurrentPage(1);
+                      }}
+                      className="shrink-0 px-3.5 py-1.5 rounded-xl glass-pill hover:bg-white/15 text-xs font-semibold text-zinc-300 hover:text-white transition-all cursor-pointer border border-white/10 focus-visible:ring-2 focus-visible:ring-red-500"
+                    >
+                      {chip.label}
+                    </button>
+                  ))}
+                </div>
+
+                {lastHomeUpdatedAt && (
+                  <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto text-xs text-zinc-400">
+                    <span className="flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-zinc-400" />
+                      Cập nhật lúc{' '}
+                      <strong className="text-zinc-200 font-semibold">
+                        {new Date(lastHomeUpdatedAt).toLocaleTimeString('vi-VN', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </strong>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => loadHome(true)}
+                      disabled={isHomeRefreshing}
+                      aria-label="Làm mới trang chủ"
+                      title="Làm mới dữ liệu trang chủ"
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 text-zinc-300 hover:text-white transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-red-500 text-xs font-semibold ${
+                        isHomeRefreshing ? 'opacity-70 cursor-not-allowed' : ''
+                      }`}
+                    >
+                      <RefreshCw className={`w-3 h-3 ${isHomeRefreshing ? 'animate-spin text-red-400' : ''}`} />
+                      <span>{isHomeRefreshing ? 'Đang tải...' : 'Làm mới'}</span>
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -611,15 +733,15 @@ export function App() {
                 </section>
               )}
 
-              {/* TOP 10 Trending Row with Giant Ranking Numbers */}
-              {newUpdated.length >= 5 && (
+              {/* TOP 10 Rated Row (requires at least 5 movies with TMDB rating) */}
+              {topRatedMovies.length >= 5 && (
                 <MovieRow
-                  title="TOP 10 Thịnh Hành Nhất Hôm Nay"
-                  subtitle="Bảng xếp hạng 10 siêu phẩm được quan tâm và xem nhiều nhất trong ngày"
-                  badge="BẢNG XẾP HẠNG"
+                  title="TOP 10 Được Đánh Giá Cao"
+                  subtitle="Điểm TMDB cao nhất trong các phim vừa cập nhật"
+                  badge="ĐÁNH GIÁ CAO"
                   icon={<Trophy className="w-5 h-5 text-amber-400" />}
                   accentGradient="bg-gradient-to-b from-amber-400 via-orange-500 to-red-500 shadow-sm shadow-amber-500/50"
-                  movies={newUpdated}
+                  movies={topRatedMovies}
                   isTop10
                   onSelectMovie={(m) => setSelectedSlug(m.slug)}
                   onQuickPlay={handleQuickPlay}
@@ -629,22 +751,23 @@ export function App() {
               )}
 
               <MovieRow
-                title="Mới Cập Nhật Hôm Nay"
-                subtitle="Phim và tập mới nhất cập nhật liên tục từng phút"
-                badge="HOT MỚI NHẤT"
+                title="Mới Cập Nhật"
+                subtitle="Phim và tập mới được cập nhật gần nhất"
+                badge="MỚI CẬP NHẬT"
                 icon={<Sparkles className="w-5 h-5 text-rose-400" />}
-                movies={newUpdated}
+                movies={latestMovies}
+                showUpdatedAt
                 onSelectMovie={(m) => setSelectedSlug(m.slug)}
                 onQuickPlay={handleQuickPlay}
                 favorites={favSlugs}
                 onToggleFav={handleToggleFav}
               />
 
-              {/* Curated Collection 1: K-Drama Hot */}
+              {/* Curated Collection 1: Korean Movies */}
               <MovieRow
-                title="K-Drama: Phim Bộ Hàn Quốc Gây Sốt"
-                subtitle="Những tựa phim truyền hình xứ Kim Chi làm mưa làm gió khắp châu Á"
-                badge="K-DRAMA TUYỂN CHỌN"
+                title="Phim Hàn Mới Cập Nhật"
+                subtitle="Phim truyền hình và điện ảnh xứ Kim Chi vừa cập nhật"
+                badge="PHIM HÀN"
                 icon={<Flame className="w-5 h-5 text-rose-500" />}
                 accentGradient="bg-gradient-to-b from-rose-500 via-pink-500 to-purple-500 shadow-sm shadow-rose-500/50"
                 movies={koreanMovies}
@@ -660,9 +783,9 @@ export function App() {
               />
 
               <MovieRow
-                title="Phim Lẻ Đỉnh Cao"
-                subtitle="Bom tấn điện ảnh, chiếu rạp sắc nét chất lượng cao"
-                badge="ĐIỆN ẢNH CHỌN LỌC"
+                title="Phim Lẻ Mới Cập Nhật"
+                subtitle="Bom tấn điện ảnh, chiếu rạp vừa cập nhật"
+                badge="PHIM LẺ"
                 icon={<Clapperboard className="w-5 h-5 text-red-500" />}
                 movies={singleMovies}
                 onSelectMovie={(m) => setSelectedSlug(m.slug)}
@@ -677,9 +800,9 @@ export function App() {
 
               {/* Curated Collection 2: Action Blockbusters */}
               <MovieRow
-                title="Siêu Phẩm Hành Động & Kịch Tính"
-                subtitle="Những pha rượt đuổi nghẹt thở, kỹ xảo mãn nhãn đỉnh nóc kịch trần"
-                badge="BLOCKBUSTER ACTION"
+                title="Hành Động Mới Cập Nhật"
+                subtitle="Phim hành động, võ thuật và kịch tính vừa cập nhật"
+                badge="HÀNH ĐỘNG"
                 icon={<Zap className="w-5 h-5 text-amber-500" />}
                 accentGradient="bg-gradient-to-b from-amber-500 via-red-500 to-rose-600 shadow-sm shadow-amber-500/50"
                 movies={actionMovies}
@@ -695,9 +818,9 @@ export function App() {
               />
 
               <MovieRow
-                title="Phim Bộ Thịnh Hành"
-                subtitle="Drama Hàn Quốc, Trung Quốc, Âu Mỹ hấp dẫn"
-                badge="SERIES DÀI TẬP"
+                title="Phim Bộ Mới Cập Nhật"
+                subtitle="Phim bộ dài tập, drama hấp dẫn vừa cập nhật"
+                badge="PHIM BỘ"
                 icon={<Tv className="w-5 h-5 text-sky-400" />}
                 movies={seriesMovies}
                 onSelectMovie={(m) => setSelectedSlug(m.slug)}

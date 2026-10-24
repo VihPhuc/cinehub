@@ -16,6 +16,7 @@ interface Props {
   onViewMore?: () => void;
   favorites: string[];
   onToggleFav: (m: MovieItem) => void;
+  showUpdatedAt?: boolean;
 }
 
 export const MovieRow: React.FC<Props> = React.memo(({
@@ -31,6 +32,7 @@ export const MovieRow: React.FC<Props> = React.memo(({
   onViewMore,
   favorites,
   onToggleFav,
+  showUpdatedAt,
 }) => {
   const scrollerRef = useRef<HTMLDivElement>(null);
 
@@ -129,6 +131,7 @@ export const MovieRow: React.FC<Props> = React.memo(({
                   onQuickPlay={() => (onQuickPlay ? onQuickPlay(movie) : onSelectMovie(movie))}
                   isFav={favorites.includes(movie.slug)}
                   onToggleFav={() => onToggleFav(movie)}
+                  showUpdatedAt={showUpdatedAt}
                 />
               </div>
             </div>
@@ -140,6 +143,7 @@ export const MovieRow: React.FC<Props> = React.memo(({
                 onQuickPlay={() => (onQuickPlay ? onQuickPlay(movie) : onSelectMovie(movie))}
                 isFav={favorites.includes(movie.slug)}
                 onToggleFav={() => onToggleFav(movie)}
+                showUpdatedAt={showUpdatedAt}
               />
             </div>
           )
