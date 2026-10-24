@@ -32,6 +32,7 @@ export interface UpstreamMovie {
   quality?: string;
   lang?: string;
   chieurap?: boolean;
+  modified?: { time?: string } | string;
   tmdb?: UpstreamTmdb;
   category?: UpstreamNamedItem[];
   country?: UpstreamNamedItem[];

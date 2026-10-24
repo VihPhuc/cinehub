@@ -52,17 +52,25 @@ is accepted.
 | Method | Path |
 |---|---|
 | GET | `/api/v1/movies/new?page=1` |
-| GET | `/api/v1/movies?type=phim-le&page=1` |
+| GET | `/api/v1/movies?type=phim-le&page=1&sort=updated` |
 | GET | `/api/v1/movies/:slug` |
-| GET | `/api/v1/genres/:slug/movies?page=1` |
-| GET | `/api/v1/countries/:slug/movies?page=1` |
+| GET | `/api/v1/genres/:slug/movies?page=1&sort=updated` |
+| GET | `/api/v1/countries/:slug/movies?page=1&sort=updated` |
 | GET | `/api/v1/search?q=avatar&page=1` |
 
 List response:
 
 ```json
 {
-  "items": [],
+  "items": [
+    {
+      "name": "Danh Sách Tử Tù (Phần 2)",
+      "slug": "danh-sach-tu-tu-phan-2",
+      "year": 2022,
+      "updatedAt": "2026-10-24T15:56:02.000Z",
+      "tmdb": { "vote_average": 7.5, "vote_count": 100 }
+    }
+  ],
   "title": "Phim Lẻ",
   "pagination": {
     "page": 1,
@@ -72,6 +80,33 @@ List response:
   }
 }
 ```
+
+`updatedAt` is the last content update time, derived from upstream
+`modified.time` and normalized to ISO 8601 UTC. It is optional: missing or
+invalid upstream timestamps are omitted. The raw upstream `modified` object is
+never returned. `updatedAt` is content recency, not the release year (`year`);
+both fields describe different things. Detail responses include the same
+`updatedAt` because they inherit the summary fields.
+
+Ordering:
+
+- `/api/v1/movies/new`: preserves upstream order, then stable-sorts by
+  `updatedAt` descending. This endpoint has no `sort` query.
+- Catalog, genre, and country: the backend requests upstream
+  `sort_field=modified.time&sort_type=desc` and stable-sorts locally by
+  `updatedAt` descending.
+- Search: keeps upstream relevance order and is never re-sorted.
+- Items without a valid timestamp (or year) sort last; ties keep their original
+  order.
+
+`sort` is optional for catalog, genre, and country:
+
+- `updated` (default): newest content update first.
+- `year`: release year descending.
+- Any other value returns `400`.
+
+The backend maps `updated` to `sort_field=modified.time` and `year` to
+`sort_field=year`, always with `sort_type=desc`.
 
 Detail response:
 
@@ -88,6 +123,7 @@ Detail response:
 `type`: `phim-le | phim-bo | hoat-hinh | tv-shows`.
 `q`/`keyword`: 1–100 characters after trim.
 `page`: 1–5000.
+`sort`: `updated | year` (catalog, genre, country only; default `updated`).
 
 ## Errors
 

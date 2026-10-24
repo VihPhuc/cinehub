@@ -210,13 +210,15 @@ GET /api/compat/v1/api/danh-sach/phim-le?page=1
 | Method | Path | Mô tả | Query |
 |---|---|---|---|
 | GET | `/api/v1/movies/new` | Phim mới cập nhật | `page` |
-| GET | `/api/v1/movies` | Catalog theo loại | `type`, `page` |
+| GET | `/api/v1/movies` | Catalog theo loại | `type`, `page`, `sort` |
 | GET | `/api/v1/movies/:slug` | Chi tiết + episodes | — |
-| GET | `/api/v1/genres/:slug/movies` | Theo thể loại | `page` |
-| GET | `/api/v1/countries/:slug/movies` | Theo quốc gia | `page` |
+| GET | `/api/v1/genres/:slug/movies` | Theo thể loại | `page`, `sort` |
+| GET | `/api/v1/countries/:slug/movies` | Theo quốc gia | `page`, `sort` |
 | GET | `/api/v1/search` | Tìm kiếm | `q`, `page` |
 
 `type` bắt buộc với `/api/v1/movies`: `phim-le | phim-bo | hoat-hinh | tv-shows`.
+`sort` chỉ có ở catalog/genre/country: `updated | year`, mặc định `updated`.
+Giá trị khác trả `400`. `/api/v1/movies/new` không nhận `sort`.
 
 Thứ tự route: `/movies/new` phải được đăng ký **trước** `/movies/:slug` để Nest
 không hiểu `new` là slug. Các route tĩnh khác cũng đặt trước route param.
@@ -234,6 +236,7 @@ không hiểu `new` là slug. Các route tĩnh khác cũng đặt trước route
       "thumb_url": "https://...",
       "poster_url": "https://...",
       "year": 2026,
+      "updatedAt": "2026-10-24T15:56:02.000Z",
       "time": "120 phút",
       "episode_current": "Full",
       "quality": "HD",
@@ -258,6 +261,18 @@ không hiểu `new` là slug. Các route tĩnh khác cũng đặt trước route
 - `pagination.page` là page thực tế đã gửi upstream.
 - Không trả các field upstream không nằm trong DTO (`modified`, `imdb`,
   `last_episodes`, `seoOnPage`, ...) để contract ổn định.
+- `updatedAt` là dẫn xuất từ `modified.time`, chuẩn hóa ISO 8601 UTC. Field
+  optional: thiếu hoặc không parse được thì bỏ, không trả raw `modified`.
+- `updatedAt` là thời điểm cập nhật nội dung, khác `year` (năm phát hành).
+
+Thứ tự danh sách:
+
+- `/api/v1/movies/new`: giữ thứ tự upstream, stable sort `updatedAt` giảm dần.
+- Catalog/genre/country: gửi upstream `sort_field=modified.time&sort_type=desc`
+  (hoặc `sort_field=year` khi `sort=year`), rồi stable sort local theo field
+  tương ứng giảm dần.
+- Search: giữ relevance order của upstream, không sort lại.
+- Item thiếu timestamp/năm hợp lệ xếp cuối; item bằng nhau giữ thứ tự gốc.
 
 #### Detail response
 
@@ -273,6 +288,7 @@ không hiểu `new` là slug. Các route tĩnh khác cũng đặt trước route
     "thumb_url": "https://...",
     "poster_url": "https://...",
     "year": 2026,
+    "updatedAt": "2026-10-24T15:56:02.000Z",
     "time": "45 phút",
     "episode_current": "Tập 10",
     "episode_total": "24",

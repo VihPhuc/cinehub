@@ -17,6 +17,7 @@ export const movieFixture = {
   tmdb: { id: 123, type: 'movie', season: null, vote_average: 7.5 },
   category: [{ name: 'Hành Động', slug: 'hanh-dong' }],
   country: [{ name: 'Việt Nam', slug: 'viet-nam' }],
+  modified: { time: '2026-10-24T15:56:02.000Z' },
 };
 
 export const newUpdatedFixture = {

@@ -16,7 +16,7 @@ describe('movie mapper', () => {
       tmdb: { id: 123, type: 'movie', season: null, vote_average: 7.5 },
       category: [{ id: '1', name: 'Hành Động', slug: 'hanh-dong' }],
       country: [{ name: 'Việt Nam', slug: 'viet-nam' }],
-      modified: 'ignored',
+      modified: { time: '2026-10-24T15:56:02.000Z' },
     } as never);
 
     expect(result).toMatchObject({
@@ -24,10 +24,29 @@ describe('movie mapper', () => {
       name: 'Tên 1 / Tên 2',
       slug: 'ten-phim',
       year: 2026,
+      updatedAt: '2026-10-24T15:56:02.000Z',
       tmdb: { id: 123, type: 'movie' },
       category: [{ name: 'Hành Động', slug: 'hanh-dong' }],
     });
     expect(result).not.toHaveProperty('modified');
+  });
+
+  it('maps a string modified timestamp and omits invalid timestamps', () => {
+    const stringTimestamp = mapMovieSummary({
+      name: 'String Modified',
+      slug: 'string-modified',
+      modified: '2026-10-24T15:56:02.000Z',
+    } as never);
+    const invalid = mapMovieSummary({
+      name: 'Invalid Modified',
+      slug: 'invalid-modified',
+      modified: { time: 'not-a-date' },
+    } as never);
+    const missing = mapMovieSummary({ name: 'Missing Modified', slug: 'missing-modified' });
+
+    expect(stringTimestamp).toMatchObject({ updatedAt: '2026-10-24T15:56:02.000Z' });
+    expect(invalid).not.toHaveProperty('updatedAt');
+    expect(missing).not.toHaveProperty('updatedAt');
   });
 
   it('maps new/list pagination and titles from both upstream shapes', () => {

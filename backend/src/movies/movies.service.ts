@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { CacheStatus } from '../cache/cache.interface';
 import { ttlFor } from '../common/config/ttl';
+import type { MovieSort } from '../common/dto/sortable-page-query.dto';
 import { PhimApiService } from '../upstream/phimapi.service';
 import { UpstreamError } from '../upstream/upstream.errors';
 import type {
@@ -43,6 +44,48 @@ function ensureDetailResponse(raw: UpstreamDetailResponse): void {
   }
 }
 
+function sortByUpdatedAtDesc<T extends { updatedAt?: string }>(items: T[]): T[] {
+  return items
+    .map((item, index) => ({ item, index, timestamp: Date.parse(item.updatedAt ?? '') }))
+    .sort((left, right) => {
+      const leftTimestamp = Number.isFinite(left.timestamp)
+        ? left.timestamp
+        : Number.NEGATIVE_INFINITY;
+      const rightTimestamp = Number.isFinite(right.timestamp)
+        ? right.timestamp
+        : Number.NEGATIVE_INFINITY;
+      if (leftTimestamp !== rightTimestamp) return rightTimestamp - leftTimestamp;
+      return left.index - right.index;
+    })
+    .map(({ item }) => item);
+}
+
+function sortByYearDesc<T extends { year?: number }>(items: T[]): T[] {
+  return items
+    .map((item, index) => ({ item, index, year: item.year }))
+    .sort((left, right) => {
+      const leftYear = left.year ?? Number.NEGATIVE_INFINITY;
+      const rightYear = right.year ?? Number.NEGATIVE_INFINITY;
+      if (leftYear !== rightYear) return rightYear - leftYear;
+      return left.index - right.index;
+    })
+    .map(({ item }) => item);
+}
+
+function sortListResult(result: MovieListDto, sort: MovieSort = 'updated'): MovieListDto {
+  const items = sort === 'year' ? sortByYearDesc(result.items) : sortByUpdatedAtDesc(result.items);
+  return { ...result, items };
+}
+
+const UPSTREAM_SORT_FIELDS: Record<MovieSort, string> = {
+  updated: 'modified.time',
+  year: 'year',
+};
+
+function upstreamSortQuery(sort: MovieSort): { sort_field: string; sort_type: 'desc' } {
+  return { sort_field: UPSTREAM_SORT_FIELDS[sort], sort_type: 'desc' };
+}
+
 @Injectable()
 export class MoviesService {
   constructor(
@@ -58,39 +101,51 @@ export class MoviesService {
     );
     ensureListResponse(raw.value);
     return {
-      result: mapListResponse(raw.value, { includeTitle: false }),
+      result: sortListResult(mapListResponse(raw.value, { includeTitle: false })),
       cache: raw.cache,
     };
   }
 
-  async getCatalog(type: string, page: number): Promise<MovieListResult> {
+  async getCatalog(
+    type: string,
+    page: number,
+    sort: MovieSort = 'updated'
+  ): Promise<MovieListResult> {
     const raw = await this.api.get<UpstreamListResponse>(
       `/v1/api/danh-sach/${type}`,
-      { page },
+      { page, ...upstreamSortQuery(sort) },
       ttlFor(this.config, 'list')
     );
     ensureListResponse(raw.value);
-    return { result: mapListResponse(raw.value), cache: raw.cache };
+    return { result: sortListResult(mapListResponse(raw.value), sort), cache: raw.cache };
   }
 
-  async getGenre(slug: string, page: number): Promise<MovieListResult> {
+  async getGenre(
+    slug: string,
+    page: number,
+    sort: MovieSort = 'updated'
+  ): Promise<MovieListResult> {
     const raw = await this.api.get<UpstreamListResponse>(
       `/v1/api/the-loai/${slug}`,
-      { page },
+      { page, ...upstreamSortQuery(sort) },
       ttlFor(this.config, 'list')
     );
     ensureListResponse(raw.value);
-    return { result: mapListResponse(raw.value), cache: raw.cache };
+    return { result: sortListResult(mapListResponse(raw.value), sort), cache: raw.cache };
   }
 
-  async getCountry(slug: string, page: number): Promise<MovieListResult> {
+  async getCountry(
+    slug: string,
+    page: number,
+    sort: MovieSort = 'updated'
+  ): Promise<MovieListResult> {
     const raw = await this.api.get<UpstreamListResponse>(
       `/v1/api/quoc-gia/${slug}`,
-      { page },
+      { page, ...upstreamSortQuery(sort) },
       ttlFor(this.config, 'list')
     );
     ensureListResponse(raw.value);
-    return { result: mapListResponse(raw.value), cache: raw.cache };
+    return { result: sortListResult(mapListResponse(raw.value), sort), cache: raw.cache };
   }
 
   async search(q: string, page: number): Promise<MovieListResult> {
