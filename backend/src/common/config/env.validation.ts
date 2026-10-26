@@ -24,6 +24,8 @@ export const envValidationSchema = Joi.object({
   UPSTREAM_MAX_BYTES: Joi.number().integer().min(1024).default(2000000),
   RATE_LIMIT_TTL_MS: Joi.number().integer().min(1000).default(60000),
   RATE_LIMIT_LIMIT: Joi.number().integer().min(1).default(120),
+  CATALOG_INDEX_PATH: Joi.string().default('data/catalog-index.json'),
+  CATALOG_INDEX_CONCURRENCY: Joi.number().integer().min(1).max(32).default(8),
   TRUST_PROXY: Joi.boolean().default(false),
   SWAGGER_ENABLED: Joi.boolean().optional(),
 }).unknown(true);

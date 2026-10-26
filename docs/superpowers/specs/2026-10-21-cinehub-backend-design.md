@@ -215,11 +215,18 @@ GET /api/compat/v1/api/danh-sach/phim-le?page=1
 | GET | `/api/v1/genres/:slug/movies` | Theo thể loại | `page`, `sort`, `order`, `year`, `category`, `country` |
 | GET | `/api/v1/countries/:slug/movies` | Theo quốc gia | `page`, `sort`, `order`, `year`, `category`, `country` |
 | GET | `/api/v1/search` | Tìm kiếm | `q`, `page` |
+| GET | `/api/v1/discover` | Sort/filter toàn catalog từ index | `page`, `sort`, `order`, `type`, `year`, `category`, `country`, `rating`, `language`, `chieurap`, `q` |
 
 `type` bắt buộc với `/api/v1/movies`: `phim-le | phim-bo | hoat-hinh | tv-shows`.
 `sort` chỉ có ở catalog/genre/country: `updated | year`, mặc định `updated`.
 `order`: `desc | asc`, mặc định `desc`. Giá trị khác trả `400`.
 `/api/v1/movies/new` không nhận `sort`, `order` hay filter.
+
+`/api/v1/discover` là bổ sung của phase catalog index: đọc snapshot JSON của 4
+loại catalog và trả sort/filter toàn catalog cho cả các field upstream bỏ qua
+(`rating`, `language`, `chieurap`, `name`). Endpoint này trả `503` khi snapshot
+chưa được build; các route cũ không đổi. Chi tiết thiết kế và vận hành xem
+[2026-10-26-cinehub-catalog-index-design.md](2026-10-26-cinehub-catalog-index-design.md).
 
 Thứ tự route: `/movies/new` phải được đăng ký **trước** `/movies/:slug` để Nest
 không hiểu `new` là slug. Các route tĩnh khác cũng đặt trước route param.

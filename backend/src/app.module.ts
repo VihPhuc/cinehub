@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { CacheModule } from './cache/cache.module';
+import { CatalogIndexModule } from './catalog-index/catalog-index.module';
 import { CompatModule } from './compat/compat.module';
 import configuration from './common/config/configuration';
 import { GlobalThrottlerGuard } from './common/guards/global-throttler.guard';
@@ -32,6 +33,7 @@ import { UpstreamModule } from './upstream/upstream.module';
     UpstreamModule,
     CompatModule,
     MoviesModule,
+    CatalogIndexModule,
     HealthModule,
   ],
   providers: [

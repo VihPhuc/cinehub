@@ -1,6 +1,7 @@
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { CatalogQueryDto } from './catalog-query.dto';
+import { DiscoverQueryDto } from './discover-query.dto';
 import { KeywordQueryDto } from './keyword-query.dto';
 import { PageQueryDto } from './page-query.dto';
 import { SearchQueryDto } from './search-query.dto';
@@ -54,6 +55,34 @@ describe('query DTO validation', () => {
     expect(
       await errors(CatalogQueryDto, { type: 'phim-le', country: 'Viet Nam' })
     ).not.toEqual([]);
+  });
+
+  it('accepts supported discover sort, order, filters, and booleans', async () => {
+    expect(
+      await errors(DiscoverQueryDto, {
+        sort: 'rating',
+        order: 'asc',
+        type: 'phim-le',
+        year: '2024',
+        category: 'hanh-dong',
+        country: 'viet-nam',
+        rating: '7.5',
+        language: 'thuyet-minh',
+        chieurap: 'true',
+        q: '  avenger  ',
+      })
+    ).toEqual([]);
+  });
+
+  it('rejects unsupported discover values', async () => {
+    expect(await errors(DiscoverQueryDto, { sort: 'view' })).not.toEqual([]);
+    expect(await errors(DiscoverQueryDto, { order: 'sideways' })).not.toEqual([]);
+    expect(await errors(DiscoverQueryDto, { rating: '10.1' })).not.toEqual([]);
+    expect(await errors(DiscoverQueryDto, { language: 'engsub' })).not.toEqual([]);
+    expect(await errors(DiscoverQueryDto, { chieurap: 'maybe' })).not.toEqual([]);
+    expect(await errors(DiscoverQueryDto, { year: '2020-2024' })).not.toEqual([]);
+    expect(await errors(DiscoverQueryDto, { category: '../secret' })).not.toEqual([]);
+    expect(await errors(DiscoverQueryDto, { q: '   ' })).not.toEqual([]);
   });
 
   it('trims search q and rejects empty or overlong values', async () => {
