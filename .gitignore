@@ -16,6 +16,10 @@ dist-ssr
 backend/.env
 backend/coverage
 
+# Backend catalog index snapshots
+backend/data/catalog-index.json
+backend/data/catalog-index.json.tmp-*
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

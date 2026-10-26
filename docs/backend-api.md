@@ -56,6 +56,7 @@ is accepted.
 | GET | `/api/v1/movies/:slug` |
 | GET | `/api/v1/genres/:slug/movies?page=1&year=2024&country=viet-nam` |
 | GET | `/api/v1/countries/:slug/movies?page=1&sort=year&order=asc` |
+| GET | `/api/v1/discover?sort=rating&order=desc&year=2024` |
 | GET | `/api/v1/search?q=avatar&page=1` |
 
 List response:
@@ -123,6 +124,83 @@ as sort/filter fields. The backend therefore does not expose full-catalog sorts
 for those fields; unsupported `sort` values return `400` instead of returning
 page-local ordering that would look like a global sort.
 
+### Discovery index (`/api/v1/discover`)
+
+`/api/v1/discover` is separate from the upstream-backed routes. It answers the
+facets PhimAPI ignores (`rating`, `language`, `chieurap`, `name`) over the whole
+catalog by reading a local JSON snapshot loaded into memory at startup.
+
+```http
+GET /api/v1/discover?page=1&sort=rating&order=desc
+    &type=phim-le&year=2024&category=hanh-dong&country=viet-nam
+    &rating=7.5&language=vietsub&chieurap=true&q=avenger
+```
+
+| Param | Values | Default |
+|---|---|---|
+| `page` | 1–5000 | 1 |
+| `sort` | `updated`, `year`, `rating`, `votes`, `name` | `updated` |
+| `order` | `desc`, `asc` | `desc` |
+| `type` | `phim-le`, `phim-bo`, `hoat-hinh`, `tv-shows` | all |
+| `year` | 1888–2100 | — |
+| `category` | category slug | — |
+| `country` | country slug | — |
+| `rating` | 0–10, minimum TMDB rating | — |
+| `language` | `vietsub`, `thuyet-minh`, `long-tieng` | — |
+| `chieurap` | `true`, `false` | — |
+| `q` | 1–100 characters, title/original title | — |
+
+```json
+{
+  "items": [{ "name": "Tên phim", "slug": "ten-phim", "year": 2024 }],
+  "pagination": {
+    "page": 1,
+    "totalPages": 1268,
+    "totalItems": 30423,
+    "totalItemsPerPage": 24
+  },
+  "facets": {
+    "years": [{ "value": 2026, "count": 1234 }],
+    "categories": [{ "slug": "hanh-dong", "name": "Hành Động", "count": 4321 }],
+    "countries": [{ "slug": "viet-nam", "name": "Việt Nam", "count": 987 }],
+    "languages": [{ "value": "vietsub", "label": "Vietsub", "count": 25000 }],
+    "totalItems": 30423,
+    "generatedAt": "2026-10-26T04:00:00.000Z"
+  }
+}
+```
+
+Semantics:
+
+- `rating=0` disables the filter; `rating>0` keeps `vote_average >= rating`
+  and excludes movies without a rating.
+- `q` matches normalized title and original title, ignoring case and
+  Vietnamese diacritics. It does not search cast, crew, or language.
+- `language` and `chieurap=false` only match movies that have the field; a
+  missing `chieurap` is not treated as `false`.
+- Missing `updatedAt`, `year`, rating, votes, or name sort last in both
+  directions. Ties keep the snapshot order.
+- Facets depend only on `type`, never on the other filters, so dropdowns keep
+  every available option. `facets.totalItems` is the count for that `type`
+  scope.
+- `X-Cache: HIT` and `Cache-Control: public, max-age=60` are used because the
+  response comes from the in-memory index.
+
+Build or refresh the snapshot with:
+
+```bash
+npm --prefix backend run index:refresh
+# restart the API afterwards
+```
+
+The snapshot path is `CATALOG_INDEX_PATH` (default
+`backend/data/catalog-index.json`, gitignored); crawl concurrency is
+`CATALOG_INDEX_CONCURRENCY` (default 8). A refresh is atomic: if any page fails,
+the previous snapshot is kept. Until a valid snapshot is loaded, `/discover`
+returns `503` with a message to run `npm run index:refresh`; all other routes
+keep working. Cast/crew search still requires a detail-page crawl and is out of
+scope.
+
 Detail response:
 
 ```json
@@ -142,6 +220,8 @@ Detail response:
 `order`: `desc | asc` (catalog, genre, country only; default `desc`).
 `year`: one year from 1888 to 2100.
 `category`, `country`: slugs using lowercase letters, digits, and hyphens.
+Discover only: `sort=updated|year|rating|votes|name`, `rating` 0–10,
+`language=vietsub|thuyet-minh|long-tieng`, `chieurap=true|false`.
 
 ## Errors
 
@@ -158,7 +238,7 @@ Detail response:
 - 404: movie not found
 - 429: rate limit exceeded (see `Retry-After`)
 - 502: upstream invalid/unavailable
-- 503: upstream rate limit
+- 503: upstream rate limit, or `/discover` catalog index not built/corrupt
 - 504: upstream timeout
 
 Error responses and failed compat envelopes always carry
@@ -174,6 +254,8 @@ stream URLs unchanged.
 - `X-Request-Id` echoes a safe client ID or generates one; use it when
   reporting an issue.
 - Cache TTL: new 2m, list 4m, search 1m, detail 6m.
+- `/api/v1/discover` is served from the in-memory catalog index, not the
+  upstream cache: `X-Cache: HIT`, `Cache-Control: public, max-age=60`.
 - Only structurally valid successful payloads are cached. `status:false`,
   malformed payloads, timeouts, and error responses are never cached.
 - Compat and normalized endpoints share the raw upstream cache.
