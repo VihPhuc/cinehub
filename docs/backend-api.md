@@ -52,10 +52,10 @@ is accepted.
 | Method | Path |
 |---|---|
 | GET | `/api/v1/movies/new?page=1` |
-| GET | `/api/v1/movies?type=phim-le&page=1&sort=updated` |
+| GET | `/api/v1/movies?type=phim-le&page=1&sort=updated&order=desc` |
 | GET | `/api/v1/movies/:slug` |
-| GET | `/api/v1/genres/:slug/movies?page=1&sort=updated` |
-| GET | `/api/v1/countries/:slug/movies?page=1&sort=updated` |
+| GET | `/api/v1/genres/:slug/movies?page=1&year=2024&country=viet-nam` |
+| GET | `/api/v1/countries/:slug/movies?page=1&sort=year&order=asc` |
 | GET | `/api/v1/search?q=avatar&page=1` |
 
 List response:
@@ -92,21 +92,36 @@ Ordering:
 
 - `/api/v1/movies/new`: preserves upstream order, then stable-sorts by
   `updatedAt` descending. This endpoint has no `sort` query.
-- Catalog, genre, and country: the backend requests upstream
-  `sort_field=modified.time&sort_type=desc` and stable-sorts locally by
-  `updatedAt` descending.
+- Catalog, genre, and country: the backend forwards `sort_field` and
+  `sort_type=<order>` upstream, then stable-sorts the page locally by the same
+  field and direction.
 - Search: keeps upstream relevance order and is never re-sorted.
-- Items without a valid timestamp (or year) sort last; ties keep their original
-  order.
+- Items without a valid timestamp (or year) sort last in both directions; ties
+  keep their original order.
 
-`sort` is optional for catalog, genre, and country:
+`sort` and `order` are optional for catalog, genre, and country:
 
-- `updated` (default): newest content update first.
-- `year`: release year descending.
+- `sort=updated` (default): content update time.
+- `sort=year`: release year.
+- `order=desc` (default) or `order=asc`.
 - Any other value returns `400`.
 
 The backend maps `updated` to `sort_field=modified.time` and `year` to
-`sort_field=year`, always with `sort_type=desc`.
+`sort_field=year`.
+
+Filters are available on the same three endpoints and can be combined:
+
+- `year`: one year, 1888–2100. Ranges and comma lists return `400` because
+  upstream only applies a single year reliably.
+- `category`: category slug, for example `hanh-dong`.
+- `country`: country slug, for example `viet-nam`.
+
+Filters are not added to `/movies/new` or `/search`.
+
+Upstream ignores `view`, `vote_average`, `vote_count`, `name`, and `language`
+as sort/filter fields. The backend therefore does not expose full-catalog sorts
+for those fields; unsupported `sort` values return `400` instead of returning
+page-local ordering that would look like a global sort.
 
 Detail response:
 
@@ -124,6 +139,9 @@ Detail response:
 `q`/`keyword`: 1–100 characters after trim.
 `page`: 1–5000.
 `sort`: `updated | year` (catalog, genre, country only; default `updated`).
+`order`: `desc | asc` (catalog, genre, country only; default `desc`).
+`year`: one year from 1888 to 2100.
+`category`, `country`: slugs using lowercase letters, digits, and hyphens.
 
 ## Errors
 

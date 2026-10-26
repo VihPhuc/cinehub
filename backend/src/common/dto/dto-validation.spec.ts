@@ -26,6 +26,36 @@ describe('query DTO validation', () => {
     expect(await errors(CatalogQueryDto, { type: 'unknown' })).not.toEqual([]);
   });
 
+  it('accepts asc and desc order but rejects other values', async () => {
+    expect(await errors(CatalogQueryDto, { type: 'phim-le', order: 'desc' })).toEqual([]);
+    expect(await errors(CatalogQueryDto, { type: 'phim-le', order: 'asc' })).toEqual([]);
+    expect(await errors(CatalogQueryDto, { type: 'phim-le', order: 'sideways' })).not.toEqual([]);
+  });
+
+  it('accepts a single year and rejects invalid years', async () => {
+    expect(await errors(CatalogQueryDto, { type: 'phim-le', year: '1888' })).toEqual([]);
+    expect(await errors(CatalogQueryDto, { type: 'phim-le', year: '2024' })).toEqual([]);
+    expect(await errors(CatalogQueryDto, { type: 'phim-le', year: '1800' })).not.toEqual([]);
+    expect(await errors(CatalogQueryDto, { type: 'phim-le', year: '2020-2024' })).not.toEqual([]);
+    expect(await errors(CatalogQueryDto, { type: 'phim-le', year: 'abc' })).not.toEqual([]);
+  });
+
+  it('accepts safe category and country slugs only', async () => {
+    expect(
+      await errors(CatalogQueryDto, {
+        type: 'phim-le',
+        category: 'hanh-dong',
+        country: 'viet-nam',
+      })
+    ).toEqual([]);
+    expect(
+      await errors(CatalogQueryDto, { type: 'phim-le', category: '../secret' })
+    ).not.toEqual([]);
+    expect(
+      await errors(CatalogQueryDto, { type: 'phim-le', country: 'Viet Nam' })
+    ).not.toEqual([]);
+  });
+
   it('trims search q and rejects empty or overlong values', async () => {
     const instance = plainToInstance(SearchQueryDto, { q: '  avatar  ' });
     expect(instance.q).toBe('avatar');

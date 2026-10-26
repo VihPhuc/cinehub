@@ -12,7 +12,7 @@ import { CatalogQueryDto, CATALOG_TYPES } from '../common/dto/catalog-query.dto'
 import { ApiErrorDto } from '../common/dto/api-response.dto';
 import { PageQueryDto } from '../common/dto/page-query.dto';
 import { SlugParamDto } from '../common/dto/slug-param.dto';
-import { MOVIE_SORTS } from '../common/dto/sortable-page-query.dto';
+import { MOVIE_ORDERS, MOVIE_SORTS } from '../common/dto/sortable-page-query.dto';
 import { ApiCommonErrors } from '../common/http/api-error-responses';
 import { setCacheHeaders } from '../common/http/cache-headers';
 import { MovieDetailResultDto, MovieListDto } from './dto/movie.dto';
@@ -42,13 +42,17 @@ export class MoviesController {
   @ApiQuery({ name: 'type', required: true, enum: CATALOG_TYPES })
   @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
   @ApiQuery({ name: 'sort', required: false, enum: MOVIE_SORTS, example: 'updated' })
+  @ApiQuery({ name: 'order', required: false, enum: MOVIE_ORDERS, example: 'desc' })
+  @ApiQuery({ name: 'year', required: false, type: Number, example: 2024 })
+  @ApiQuery({ name: 'category', required: false, type: String, example: 'hanh-dong' })
+  @ApiQuery({ name: 'country', required: false, type: String, example: 'viet-nam' })
   @ApiOkResponse({ type: MovieListDto })
   @ApiCommonErrors()
   async getCatalog(
     @Query() query: CatalogQueryDto,
     @Res({ passthrough: true }) response: Response
   ) {
-    const result = await this.movies.getCatalog(query.type, query.page, query.sort);
+    const result = await this.movies.getCatalog(query.type, query);
     setCacheHeaders(response, result.cache, 30);
     return result.result;
   }

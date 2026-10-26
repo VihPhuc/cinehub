@@ -114,10 +114,10 @@ describe('Normalized list API', () => {
     }
   });
 
-  it('supports sort=year and rejects unsupported sort values', async () => {
+  it('supports sort=year with asc order and rejects unsupported values', async () => {
     const before = stub.requests.length;
     await request(app.getHttpServer())
-      .get('/api/v1/movies?type=phim-le&page=4&sort=year')
+      .get('/api/v1/movies?type=phim-le&page=4&sort=year&order=asc')
       .expect(200);
     const url = stub.requests
       .slice(before)
@@ -125,14 +125,52 @@ describe('Normalized list API', () => {
 
     expect(url).toBeDefined();
     expect(url).toContain('sort_field=year');
-    expect(url).toContain('sort_type=desc');
+    expect(url).toContain('sort_type=asc');
 
     await request(app.getHttpServer())
       .get('/api/v1/movies?type=phim-le&page=4&sort=rating')
       .expect(400);
     await request(app.getHttpServer())
+      .get('/api/v1/movies?type=phim-le&page=4&order=sideways')
+      .expect(400);
+    await request(app.getHttpServer())
       .get('/api/v1/genres/hanh-dong/movies?sort=rating')
       .expect(400);
+  });
+
+  it('forwards year, category, and country filters to upstream', async () => {
+    const before = stub.requests.length;
+    await request(app.getHttpServer())
+      .get(
+        '/api/v1/movies?type=phim-le&page=6&year=2024&category=hanh-dong&country=viet-nam'
+      )
+      .expect(200);
+    await request(app.getHttpServer())
+      .get('/api/v1/genres/hanh-dong/movies?page=6&year=2024&country=viet-nam')
+      .expect(200);
+    await request(app.getHttpServer())
+      .get('/api/v1/countries/viet-nam/movies?page=6&year=2024&category=hanh-dong')
+      .expect(200);
+
+    const urls = stub.requests.slice(before);
+    const catalogUrl = urls.find((entry) =>
+      entry.startsWith('/v1/api/danh-sach/phim-le')
+    );
+    expect(catalogUrl).toContain('year=2024');
+    expect(catalogUrl).toContain('category=hanh-dong');
+    expect(catalogUrl).toContain('country=viet-nam');
+
+    const genreUrl = urls.find((entry) =>
+      entry.startsWith('/v1/api/the-loai/hanh-dong')
+    );
+    expect(genreUrl).toContain('year=2024');
+    expect(genreUrl).toContain('country=viet-nam');
+
+    const countryUrl = urls.find((entry) =>
+      entry.startsWith('/v1/api/quoc-gia/viet-nam')
+    );
+    expect(countryUrl).toContain('year=2024');
+    expect(countryUrl).toContain('category=hanh-dong');
   });
 
   it('sorts by updatedAt and year while preserving search relevance order', async () => {
@@ -150,10 +188,18 @@ describe('Normalized list API', () => {
       year: 2020,
       modified: { time: '2026-10-24T15:00:00.000Z' },
     };
+    const missing = {
+      ...movieFixture,
+      name: 'Missing',
+      slug: 'missing',
+      year: undefined,
+      modified: undefined,
+    };
+    const items = [older, missing, newer];
     const pagination = {
       currentPage: 1,
       totalPages: 1,
-      totalItems: 2,
+      totalItems: 3,
       totalItemsPerPage: 24,
     };
     const send = (response: ServerResponse, body: unknown) => {
@@ -163,20 +209,20 @@ describe('Normalized list API', () => {
     const ordered = await startUpstreamStub((upstreamRequest, response) => {
       const path = (upstreamRequest.url ?? '').split('?')[0];
       if (path === '/danh-sach/phim-moi-cap-nhat') {
-        send(response, { status: true, items: [older, newer], pagination });
+        send(response, { status: true, items, pagination });
         return;
       }
       if (path === '/v1/api/danh-sach/phim-le') {
         send(response, {
           status: true,
-          data: { titlePage: 'Phim Lẻ', items: [older, newer], params: { pagination } },
+          data: { titlePage: 'Phim Lẻ', items, params: { pagination } },
         });
         return;
       }
       if (path === '/v1/api/tim-kiem') {
         send(response, {
           status: true,
-          data: { items: [older, newer], params: { pagination } },
+          data: { items, params: { pagination } },
         });
         return;
       }
@@ -196,6 +242,12 @@ describe('Normalized list API', () => {
       const yearResponse = await request(orderedApp.getHttpServer())
         .get('/api/v1/movies?type=phim-le&page=1&sort=year')
         .expect(200);
+      const yearAscResponse = await request(orderedApp.getHttpServer())
+        .get('/api/v1/movies?type=phim-le&page=1&sort=year&order=asc')
+        .expect(200);
+      const updatedAscResponse = await request(orderedApp.getHttpServer())
+        .get('/api/v1/movies?type=phim-le&page=1&sort=updated&order=asc')
+        .expect(200);
       const searchResponse = await request(orderedApp.getHttpServer())
         .get('/api/v1/search?q=order-test&page=1')
         .expect(200);
@@ -203,17 +255,31 @@ describe('Normalized list API', () => {
       expect(newResponse.body.items.map((item: { slug: string }) => item.slug)).toEqual([
         'newer',
         'older',
+        'missing',
       ]);
       expect(catalogResponse.body.items.map((item: { slug: string }) => item.slug)).toEqual([
         'newer',
         'older',
+        'missing',
       ]);
       expect(yearResponse.body.items.map((item: { slug: string }) => item.slug)).toEqual([
         'older',
         'newer',
+        'missing',
+      ]);
+      expect(yearAscResponse.body.items.map((item: { slug: string }) => item.slug)).toEqual([
+        'newer',
+        'older',
+        'missing',
+      ]);
+      expect(updatedAscResponse.body.items.map((item: { slug: string }) => item.slug)).toEqual([
+        'older',
+        'newer',
+        'missing',
       ]);
       expect(searchResponse.body.items.map((item: { slug: string }) => item.slug)).toEqual([
         'older',
+        'missing',
         'newer',
       ]);
     } finally {
@@ -245,10 +311,17 @@ describe('Normalized list API', () => {
     expect(normalized.headers['x-cache']).toBe('HIT');
   });
 
-  it('rejects invalid type, page, and search query', async () => {
+  it('rejects invalid type, page, sort, filter, and search query', async () => {
     await request(app.getHttpServer()).get('/api/v1/movies?type=unknown').expect(400);
     await request(app.getHttpServer()).get('/api/v1/movies/new?page=5001').expect(400);
     await request(app.getHttpServer()).get('/api/v1/search?q=').expect(400);
+    await request(app.getHttpServer()).get('/api/v1/movies?type=phim-le&year=1800').expect(400);
+    await request(app.getHttpServer())
+      .get('/api/v1/genres/hanh-dong/movies?category=..%2Fsecret')
+      .expect(400);
+    await request(app.getHttpServer())
+      .get('/api/v1/countries/viet-nam/movies?country=Viet%20Nam')
+      .expect(400);
   });
 
   it('returns 502 when the upstream list says status:false', async () => {

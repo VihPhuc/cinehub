@@ -210,15 +210,16 @@ GET /api/compat/v1/api/danh-sach/phim-le?page=1
 | Method | Path | Mô tả | Query |
 |---|---|---|---|
 | GET | `/api/v1/movies/new` | Phim mới cập nhật | `page` |
-| GET | `/api/v1/movies` | Catalog theo loại | `type`, `page`, `sort` |
+| GET | `/api/v1/movies` | Catalog theo loại | `type`, `page`, `sort`, `order`, `year`, `category`, `country` |
 | GET | `/api/v1/movies/:slug` | Chi tiết + episodes | — |
-| GET | `/api/v1/genres/:slug/movies` | Theo thể loại | `page`, `sort` |
-| GET | `/api/v1/countries/:slug/movies` | Theo quốc gia | `page`, `sort` |
+| GET | `/api/v1/genres/:slug/movies` | Theo thể loại | `page`, `sort`, `order`, `year`, `category`, `country` |
+| GET | `/api/v1/countries/:slug/movies` | Theo quốc gia | `page`, `sort`, `order`, `year`, `category`, `country` |
 | GET | `/api/v1/search` | Tìm kiếm | `q`, `page` |
 
 `type` bắt buộc với `/api/v1/movies`: `phim-le | phim-bo | hoat-hinh | tv-shows`.
 `sort` chỉ có ở catalog/genre/country: `updated | year`, mặc định `updated`.
-Giá trị khác trả `400`. `/api/v1/movies/new` không nhận `sort`.
+`order`: `desc | asc`, mặc định `desc`. Giá trị khác trả `400`.
+`/api/v1/movies/new` không nhận `sort`, `order` hay filter.
 
 Thứ tự route: `/movies/new` phải được đăng ký **trước** `/movies/:slug` để Nest
 không hiểu `new` là slug. Các route tĩnh khác cũng đặt trước route param.
@@ -265,14 +266,29 @@ không hiểu `new` là slug. Các route tĩnh khác cũng đặt trước route
   optional: thiếu hoặc không parse được thì bỏ, không trả raw `modified`.
 - `updatedAt` là thời điểm cập nhật nội dung, khác `year` (năm phát hành).
 
+Filter catalog/genre/country (có thể kết hợp):
+
+- `year`: một năm trong khoảng 1888–2100. Range/comma trả `400` vì upstream chỉ
+  áp dụng đúng một năm.
+- `category`: slug thể loại, ví dụ `hanh-dong`.
+- `country`: slug quốc gia, ví dụ `viet-nam`.
+- Filter không áp dụng cho `/movies/new` và `/search`.
+
+Giới hạn upstream (khảo sát 2026-10):
+
+- `sort_field=modified.time|year` hoạt động với cả `asc`/`desc`.
+- `view`, `vote_average`, `vote_count`, `name`, `language` bị upstream bỏ qua.
+- Vì vậy backend không mở sort/filter toàn catalog cho các field đó; giá trị
+  `sort` không hỗ trợ trả `400` thay vì sort tạm trong 24 item/trang.
+
 Thứ tự danh sách:
 
 - `/api/v1/movies/new`: giữ thứ tự upstream, stable sort `updatedAt` giảm dần.
-- Catalog/genre/country: gửi upstream `sort_field=modified.time&sort_type=desc`
-  (hoặc `sort_field=year` khi `sort=year`), rồi stable sort local theo field
-  tương ứng giảm dần.
+- Catalog/genre/country: gửi upstream `sort_field` + `sort_type=<order>`, kèm
+  filter, rồi stable sort local theo cùng field và hướng.
 - Search: giữ relevance order của upstream, không sort lại.
-- Item thiếu timestamp/năm hợp lệ xếp cuối; item bằng nhau giữ thứ tự gốc.
+- Item thiếu timestamp/năm hợp lệ xếp cuối ở cả hai hướng; item bằng nhau giữ
+  thứ tự gốc.
 
 #### Detail response
 
