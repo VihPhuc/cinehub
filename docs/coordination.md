@@ -214,7 +214,7 @@ Kiểm tra thủ công bằng Chrome headless + CDP trên `vite preview`:
     - Dòng thông tin metadata chuẩn Netflix: Điểm `% Phù hợp` xanh lá, badge độ tuổi `16+`, badge chất lượng `HD`, năm phát hành, thời lượng và quốc gia.
   - **Header & Thanh điều hướng Netflix Glass (`Navbar.tsx`, `NavbarLogo.tsx`, `DesktopNav.tsx`):**
     - Thanh điều hướng tự động chuyển đổi hiệu ứng: trong suốt khi ở đầu trang (`scrollY <= 20`) và chuyển sang kính mờ tối màu sang trọng (`bg-[#141414]/95 backdrop-blur-md border-b border-white/[0.08]`) khi cuộn xuống.
-    - Logo `CINEHUB`: chữ `CINE` màu trắng sắc sảo, chữ `HUB` đỏ rực rỡ `#E50914`, tab đang chọn có thanh gạch chân màu đỏ Netflix phát sáng.
+    - **Loại bỏ nút Bảng Màu (Theme Selector):** Gỡ bỏ hoàn toàn nút Palette gây hiểu nhầm khỏi thanh Header và Mobile Drawer để tinh gọn giao diện, cố định bản sắc thương hiệu Đỏ Netflix & Đen Điện Ảnh thống nhất 100%.
   - **Kiểm thử & Chất lượng:**
     - Đạt 76/76 tests Vitest frontend, `oxlint` 0 lỗi, TypeScript typecheck sạch sẽ, bundle production build hoàn tất an toàn.
 

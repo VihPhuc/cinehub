@@ -19,7 +19,6 @@ import type { MovieDetail, MovieItem, FavoriteItem, HistoryItem } from '@/shared
 import { getFavorites, getHistory, toggleFavorite, clearHistory, removeHistoryItem, subscribeToStorage } from '@/shared/storage';
 import { buildUrlSearch, parseUrlState } from './urlState';
 import { ArrowUp, WifiOff, Play, Clock, ChevronRight, Trophy, Sparkles, Flame, Zap, Clapperboard, Tv, RefreshCw } from 'lucide-react';
-import { THEME_OPTIONS } from '@/shared/theme';
 import { Navbar } from '@/features/navigation/Navbar';
 import { HeroBanner } from '@/features/home/HeroBanner';
 import { MovieRow } from '@/features/catalog/MovieRow';
@@ -594,10 +593,6 @@ export function App() {
         onRandomMovie={handleRandomMovie}
         onInstallPwa={handleInstallApp}
         canInstallPwa={Boolean(deferredPrompt)}
-        onThemeChange={(themeId) => {
-          const themeObj = THEME_OPTIONS.find((t) => t.id === themeId);
-          showToast(`Đã chuyển tông màu: ${themeObj?.name || themeId} ✨`, 'success');
-        }}
       />
 
       <main id="main-content" className="flex-1 pb-24 md:pb-16 relative z-10">

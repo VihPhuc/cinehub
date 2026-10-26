@@ -6,15 +6,12 @@ import {
   Sparkles,
   Download,
 } from 'lucide-react';
-import { type ThemeAccent } from '@/shared/theme';
 import { NavbarLogo } from './NavbarLogo';
 import { DesktopNav } from './DesktopNav';
 import { SearchBar } from './SearchBar';
-import { ThemePicker } from './ThemePicker';
 import { MobileDrawer } from './MobileDrawer';
 import { useRecentSearches } from './hooks/useRecentSearches';
 import { useNavbarSearch } from './hooks/useNavbarSearch';
-import { useThemeAccent } from './hooks/useThemeAccent';
 
 interface Props {
   activeTab: string;
@@ -26,7 +23,6 @@ interface Props {
   onRandomMovie?: () => void;
   onInstallPwa?: () => void;
   canInstallPwa?: boolean;
-  onThemeChange?: (theme: ThemeAccent) => void;
 }
 
 export const Navbar: React.FC<Props> = ({
@@ -39,7 +35,6 @@ export const Navbar: React.FC<Props> = ({
   onRandomMovie,
   onInstallPwa,
   canInstallPwa,
-  onThemeChange,
 }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
@@ -52,14 +47,6 @@ export const Navbar: React.FC<Props> = ({
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
-
-  const {
-    currentTheme,
-    showThemePicker,
-    themePickerRef,
-    toggleThemePicker,
-    selectTheme,
-  } = useThemeAccent(onThemeChange);
 
   const {
     recentSearches,
@@ -169,14 +156,6 @@ export const Navbar: React.FC<Props> = ({
             </button>
           )}
 
-          <ThemePicker
-            currentTheme={currentTheme}
-            showThemePicker={showThemePicker}
-            themePickerRef={themePickerRef}
-            onToggle={toggleThemePicker}
-            onSelect={selectTheme}
-          />
-
           {/* PWA Install Button */}
           {canInstallPwa && onInstallPwa && (
             <button
@@ -205,14 +184,12 @@ export const Navbar: React.FC<Props> = ({
       <MobileDrawer
         open={menuOpen}
         activeTab={activeTab}
-        currentTheme={currentTheme}
         canInstallPwa={canInstallPwa}
         onSelectTab={onSelectTab}
         onSelectGenre={onSelectGenre}
         onSelectCountry={onSelectCountry}
         onRandomMovie={onRandomMovie}
         onInstallPwa={onInstallPwa}
-        onSelectTheme={selectTheme}
         onClose={() => setMenuOpen(false)}
       />
     </header>
