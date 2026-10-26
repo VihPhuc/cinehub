@@ -188,6 +188,10 @@ Kiểm tra thủ công bằng Chrome headless + CDP trên `vite preview`:
     - Tích hợp Web Share API (`navigator.share`) cho phép chia sẻ nhanh trực tiếp qua Zalo, Messenger, Telegram hoặc SMS trên điện thoại di động; tự động fallback về sao chép liên kết vào clipboard trên máy tính.
   - **Nút truy cập nhanh Vòng Quay Phim:**
     - Bổ sung nút "🎲 Vòng Quay Phim" trực tiếp vào hàng Category Chips dưới Hero Banner trang chủ để người dùng bấm quay ngay khi phân vân không biết xem gì.
+  - **Thiết kế lại Footer Tinh Gọn & Đẳng Cấp (`App.tsx`):**
+    - Bỏ hoàn toàn 3 khối hộp tính năng cồng kềnh (Luồng phát, PWA, Tủ phim) chiếm diện tích lớn và tạo cảm giác trang thương mại điện tử thay vì rạp chiếu phim trực tuyến.
+    - Chuyển sang phong cách footer tối giản, sang trọng (chuẩn streaming platform Netflix/Apple TV+), hiển thị slogan gọn gàng, hệ thống link danh mục đầy đủ (thêm TV Shows) và bản quyền nhẹ nhàng.
+    - Tối ưu padding an toàn (`pt-8 pb-28 md:pb-8`) và vị trí nút Scroll-to-Top / Toast (`bottom-[5.25rem]`), đảm bảo không bị đè bởi thanh `MobileBottomNav` trên smartphone.
 
 
 

@@ -954,59 +954,84 @@ export function App() {
         )}
       </main>
 
-      {/* Enhanced Footer */}
-      <footer className="bg-[#07080b] border-t border-white/[0.08] py-12 px-4 sm:px-6 lg:px-8 relative z-10">
-        <div className="w-full max-w-[1720px] mx-auto space-y-8">
-          {/* Top Feature Badges */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pb-8 border-b border-white/[0.06]">
-            <div className="glass-panel p-4 rounded-2xl flex items-center gap-3.5">
-              <div className="w-10 h-10 rounded-xl bg-red-600/20 text-red-400 flex items-center justify-center shrink-0 border border-red-500/30">
-                🚀
-              </div>
-              <div>
-                <h4 className="text-xs sm:text-sm font-bold text-zinc-100">Luồng Phát Tốc Độ Cao</h4>
-                <p className="text-[11px] text-zinc-400">Xem m3u8 không giật lag, hỗ trợ Full HD & 4K</p>
-              </div>
-            </div>
-            <div className="glass-panel p-4 rounded-2xl flex items-center gap-3.5">
-              <div className="w-10 h-10 rounded-xl bg-indigo-600/20 text-indigo-400 flex items-center justify-center shrink-0 border border-indigo-500/30">
-                📱
-              </div>
-              <div>
-                <h4 className="text-xs sm:text-sm font-bold text-zinc-100">Hỗ Trợ PWA Ngoại Tuyến</h4>
-                <p className="text-[11px] text-zinc-400">Cài đặt như app native trên điện thoại & máy tính</p>
-              </div>
-            </div>
-            <div className="glass-panel p-4 rounded-2xl flex items-center gap-3.5">
-              <div className="w-10 h-10 rounded-xl bg-emerald-600/20 text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/30">
-                ⭐
-              </div>
-              <div>
-                <h4 className="text-xs sm:text-sm font-bold text-zinc-100">Tủ Phim Cá Nhân</h4>
-                <p className="text-[11px] text-zinc-400">Lưu yêu thích, nhớ thời gian và sao lưu JSON</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-zinc-400">
-            <div className="flex items-center gap-2">
+      {/* Sleek Minimalist Footer */}
+      <footer className="bg-[#050608] border-t border-white/[0.08] pt-8 pb-28 md:pb-8 px-4 sm:px-6 lg:px-8 relative z-10">
+        <div className="w-full max-w-[1720px] mx-auto space-y-5">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-zinc-400">
+            <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 text-center md:text-left">
               <span className="text-base font-black font-heading text-white tracking-tight">
                 CINE<span className="bg-gradient-to-r from-red-500 to-amber-400 bg-clip-text text-transparent">HUB</span>
               </span>
-              <span className="text-zinc-600">|</span>
-              <span>Trải nghiệm xem phim điện ảnh trực tuyến chuẩn hiện đại</span>
+              <span className="hidden sm:inline text-zinc-700">|</span>
+              <span className="text-zinc-400">Trải nghiệm xem phim điện ảnh trực tuyến chuẩn hiện đại, tốc độ cao & miễn phí</span>
             </div>
-            <div className="flex items-center gap-4 text-xs font-medium">
-              <button onClick={() => { setActiveTab('home'); setCurrentPage(1); }} className="hover:text-white cursor-pointer">Trang Chủ</button>
-              <button onClick={() => { setActiveTab('phim-le'); setCurrentPage(1); }} className="hover:text-white cursor-pointer">Phim Lẻ</button>
-              <button onClick={() => { setActiveTab('phim-bo'); setCurrentPage(1); }} className="hover:text-white cursor-pointer">Phim Bộ</button>
-              <button onClick={() => { setActiveTab('hoat-hinh'); setCurrentPage(1); }} className="hover:text-white cursor-pointer">Anime</button>
-              <button onClick={() => { setActiveTab('library'); }} className="hover:text-white cursor-pointer">Tủ Phim</button>
-            </div>
+
+            <nav aria-label="Liên kết chân trang" className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs font-medium text-zinc-400">
+              <button
+                onClick={() => {
+                  setActiveTab('home');
+                  setCurrentPage(1);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="hover:text-white transition-colors cursor-pointer"
+              >
+                Trang Chủ
+              </button>
+              <button
+                onClick={() => {
+                  setActiveTab('phim-le');
+                  setCurrentPage(1);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="hover:text-white transition-colors cursor-pointer"
+              >
+                Phim Lẻ
+              </button>
+              <button
+                onClick={() => {
+                  setActiveTab('phim-bo');
+                  setCurrentPage(1);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="hover:text-white transition-colors cursor-pointer"
+              >
+                Phim Bộ
+              </button>
+              <button
+                onClick={() => {
+                  setActiveTab('hoat-hinh');
+                  setCurrentPage(1);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="hover:text-white transition-colors cursor-pointer"
+              >
+                Anime
+              </button>
+              <button
+                onClick={() => {
+                  setActiveTab('tv-shows');
+                  setCurrentPage(1);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="hover:text-white transition-colors cursor-pointer"
+              >
+                TV Shows
+              </button>
+              <button
+                onClick={() => {
+                  setActiveTab('library');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="hover:text-white transition-colors cursor-pointer"
+              >
+                Tủ Phim
+              </button>
+            </nav>
           </div>
 
-          <div className="text-center text-[11px] text-zinc-400 border-t border-white/[0.04] pt-6">
+          <div className="text-center text-[11px] text-zinc-500 border-t border-white/[0.04] pt-4 space-y-1">
             <p>© 2026 CineHub. Dữ liệu tổng hợp từ nguồn phim công khai PhimAPI và CDN quốc tế.</p>
+            <p className="text-[10px] text-zinc-600">Trang web phi lợi nhuận phục vụ mục đích học tập và giải trí cá nhân.</p>
           </div>
         </div>
       </footer>
@@ -1054,7 +1079,7 @@ export function App() {
         <div
           role="status"
           aria-live="polite"
-          className="fixed bottom-20 sm:bottom-7 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2.5 px-4 py-2.5 rounded-2xl glass-dropdown border border-white/20 shadow-2xl animate-in fade-in slide-in-from-bottom-3 duration-200 pointer-events-none"
+          className="fixed bottom-[5.25rem] sm:bottom-7 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2.5 px-4 py-2.5 rounded-2xl glass-dropdown border border-white/20 shadow-2xl animate-in fade-in slide-in-from-bottom-3 duration-200 pointer-events-none"
         >
           <div
             className={`w-2 h-2 rounded-full shrink-0 ${
@@ -1073,7 +1098,7 @@ export function App() {
       {showScrollTop && (
         <button
           onClick={scrollToTop}
-          className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 p-3.5 rounded-2xl bg-gradient-to-tr from-red-600 to-rose-500 hover:from-red-500 hover:to-rose-400 text-white shadow-2xl glow-red cursor-pointer transition-all z-40 hover:scale-110 active:scale-95 border border-white/20"
+          className="fixed bottom-[5.25rem] right-4 sm:bottom-6 sm:right-6 p-3 rounded-2xl bg-gradient-to-tr from-red-600 to-rose-500 hover:from-red-500 hover:to-rose-400 text-white shadow-2xl glow-red cursor-pointer transition-all z-40 hover:scale-110 active:scale-95 border border-white/20"
           title="Cuộn lên đầu trang"
         >
           <ArrowUp className="w-5 h-5" />
