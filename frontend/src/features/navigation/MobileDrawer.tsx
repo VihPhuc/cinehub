@@ -1,38 +1,33 @@
-import { Bookmark, Check, Download, Palette, Sparkles } from 'lucide-react';
+import { Bookmark, Download, Sparkles } from 'lucide-react';
 import { GENRES, COUNTRIES, NAV_TABS } from './constants';
-import { THEME_OPTIONS, type ThemeAccent } from '@/shared/theme';
 
 interface MobileDrawerProps {
   open: boolean;
   activeTab: string;
-  currentTheme: ThemeAccent;
   canInstallPwa?: boolean;
   onSelectTab: (tab: string) => void;
   onSelectGenre: (slug: string, name: string) => void;
   onSelectCountry: (slug: string, name: string) => void;
   onRandomMovie?: () => void;
   onInstallPwa?: () => void;
-  onSelectTheme: (theme: ThemeAccent) => void;
   onClose: () => void;
 }
 
 export function MobileDrawer({
   open,
   activeTab,
-  currentTheme,
   canInstallPwa,
   onSelectTab,
   onSelectGenre,
   onSelectCountry,
   onRandomMovie,
   onInstallPwa,
-  onSelectTheme,
   onClose,
 }: MobileDrawerProps) {
   if (!open) return null;
 
   return (
-    <div id="mobile-nav-drawer" className="xl:hidden border-t border-white/[0.08] bg-[#090a0f]/95 backdrop-blur-2xl px-4 py-4 space-y-4 max-h-[80vh] overflow-y-auto shadow-2xl animate-in fade-in slide-in-from-top-4 duration-200">
+    <div id="mobile-nav-drawer" className="xl:hidden border-t border-white/[0.08] bg-[#141414]/98 backdrop-blur-2xl px-4 py-4 space-y-4 max-h-[80vh] overflow-y-auto shadow-2xl animate-in fade-in slide-in-from-top-4 duration-200">
       <div className="grid grid-cols-2 gap-2">
         {NAV_TABS.filter((t) => !['genres', 'countries', 'library'].includes(t.id)).map((t) => (
           <button
@@ -85,35 +80,6 @@ export function MobileDrawer({
             <Download className="w-4 h-4 text-red-400" /> Cài Đặt Ứng Dụng (PWA)
           </button>
         )}
-      </div>
-
-      {/* Mobile Theme Accent Selector */}
-      <div className="pt-2 border-t border-white/[0.08]">
-        <div className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-          <Palette className="w-3.5 h-3.5 text-zinc-400" />
-          Tông màu giao diện
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          {THEME_OPTIONS.map((theme) => {
-            const isSelected = currentTheme === theme.id;
-            return (
-              <button
-                key={theme.id}
-                type="button"
-                onClick={() => onSelectTheme(theme.id)}
-                className={`flex items-center gap-2 p-2 rounded-xl border transition-all cursor-pointer ${
-                  isSelected
-                    ? 'bg-white/[0.12] border-white/30 shadow-sm'
-                    : 'bg-white/[0.04] border-white/[0.08] hover:bg-white/[0.08]'
-                }`}
-              >
-                <span className={`w-4 h-4 rounded-full bg-gradient-to-tr ${theme.gradient} shrink-0`} />
-                <span className="text-xs font-semibold text-white truncate">{theme.name}</span>
-                {isSelected && <Check className="w-3.5 h-3.5 text-white ml-auto shrink-0" />}
-              </button>
-            );
-          })}
-        </div>
       </div>
 
       {/* Mobile Genres */}

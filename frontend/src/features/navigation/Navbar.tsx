@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Bookmark,
   Menu,
@@ -6,15 +6,12 @@ import {
   Sparkles,
   Download,
 } from 'lucide-react';
-import { type ThemeAccent } from '@/shared/theme';
 import { NavbarLogo } from './NavbarLogo';
 import { DesktopNav } from './DesktopNav';
 import { SearchBar } from './SearchBar';
-import { ThemePicker } from './ThemePicker';
 import { MobileDrawer } from './MobileDrawer';
 import { useRecentSearches } from './hooks/useRecentSearches';
 import { useNavbarSearch } from './hooks/useNavbarSearch';
-import { useThemeAccent } from './hooks/useThemeAccent';
 
 interface Props {
   activeTab: string;
@@ -26,7 +23,6 @@ interface Props {
   onRandomMovie?: () => void;
   onInstallPwa?: () => void;
   canInstallPwa?: boolean;
-  onThemeChange?: (theme: ThemeAccent) => void;
 }
 
 export const Navbar: React.FC<Props> = ({
@@ -39,16 +35,18 @@ export const Navbar: React.FC<Props> = ({
   onRandomMovie,
   onInstallPwa,
   canInstallPwa,
-  onThemeChange,
 }) => {
   const [menuOpen, setMenuOpen] = useState(false);
-  const {
-    currentTheme,
-    showThemePicker,
-    themePickerRef,
-    toggleThemePicker,
-    selectTheme,
-  } = useThemeAccent(onThemeChange);
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrolled = window.scrollY > 20;
+      setIsScrolled((prev) => (prev !== scrolled ? scrolled : prev));
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const {
     recentSearches,
@@ -83,7 +81,13 @@ export const Navbar: React.FC<Props> = ({
   });
 
   return (
-    <header className="sticky top-0 z-40 w-full bg-[#090a0f]/85 backdrop-blur-xl border-b border-white/[0.08] transition-all">
+    <header
+      className={`sticky top-0 z-40 w-full transition-all duration-300 ${
+        isScrolled
+          ? 'bg-[#141414]/95 backdrop-blur-md border-b border-white/[0.08] shadow-2xl'
+          : 'bg-gradient-to-b from-black/85 via-black/45 to-transparent border-b border-transparent'
+      }`}
+    >
       <div className="w-full max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 min-h-16 flex flex-wrap items-center justify-between gap-3 py-2 sm:h-16 sm:flex-nowrap sm:py-0 2xl:gap-6">
         {/* Left Section: Logo & Desktop Navigation */}
         <div className="flex items-center gap-3 2xl:gap-8 min-w-0">
@@ -152,14 +156,6 @@ export const Navbar: React.FC<Props> = ({
             </button>
           )}
 
-          <ThemePicker
-            currentTheme={currentTheme}
-            showThemePicker={showThemePicker}
-            themePickerRef={themePickerRef}
-            onToggle={toggleThemePicker}
-            onSelect={selectTheme}
-          />
-
           {/* PWA Install Button */}
           {canInstallPwa && onInstallPwa && (
             <button
@@ -188,14 +184,12 @@ export const Navbar: React.FC<Props> = ({
       <MobileDrawer
         open={menuOpen}
         activeTab={activeTab}
-        currentTheme={currentTheme}
         canInstallPwa={canInstallPwa}
         onSelectTab={onSelectTab}
         onSelectGenre={onSelectGenre}
         onSelectCountry={onSelectCountry}
         onRandomMovie={onRandomMovie}
         onInstallPwa={onInstallPwa}
-        onSelectTheme={selectTheme}
         onClose={() => setMenuOpen(false)}
       />
     </header>

@@ -170,7 +170,54 @@ Kiểm tra thủ công bằng Chrome headless + CDP trên `vite preview`:
     - `fetchWithCache` và các API getter hỗ trợ `options?: RequestOptions` với `bypassCache: true`, gửi request `cache: 'no-store'` và cập nhật bộ nhớ đệm khi có kết quả mới.
     - Service Worker (`sw.js`): nhận diện `request.cache === 'no-store'` để bỏ qua đọc cache và fetch network; nâng cấp `API_CACHE` lên `cinehub-api-v4` và `SHELL_CACHE` lên `cinehub-shell-v6`.
   - **Kiểm thử:**
-    - Toàn bộ **72/72 tests frontend** pass (thêm 5 test mới cho `sanitizeMovieItem`, `sortMoviesByUpdatedAtDesc`, `selectTopRatedMovies`, SW `no-store` cache bypass, và `getNewUpdatedMovies` bypassCache).
+    - Toàn bộ **76/76 tests frontend** pass (thêm 5 test mới cho `sanitizeMovieItem`, `sortMoviesByUpdatedAtDesc`, `selectTopRatedMovies`, SW `no-store` cache bypass, và `getNewUpdatedMovies` bypassCache).
     - `oxlint` 0 lỗi, TypeScript typecheck pass, Vite production build hoàn tất sạch sẽ.
+
+- **Tối ưu trải nghiệm UI/UX đa nền tảng (Desktop & Mobile) (`feat/frontend-ui-ux-optimization` - 2026-10-26):**
+  - **Thanh điều hướng Mobile Bottom Nav (`MobileBottomNav.tsx`):**
+    - Thiết kế thanh điều hướng cố định chân màn hình (`fixed bottom-0 inset-x-0 z-40 md:hidden`) với hiệu ứng kính mờ cao cấp (`backdrop-blur-2xl`), hỗ trợ vùng an toàn thiết bị (`env(safe-area-inset-bottom)`).
+    - 5 nút chạm nhanh ngón cái tiện lợi: Trang Chủ, Phim Lẻ, Vòng Quay May Mắn (nút hành động nổi bật), Phim Bộ, và Tủ Phim (kèm badge đếm số phim đã lưu).
+    - Đồng bộ tự động vị trí Scroll-to-Top và Toast thông báo tránh bị che khuất trên mobile.
+  - **Thiết kế Typography & Badge TOP 10 Hiện Đại (`MovieRow.tsx`, `MovieCard.tsx`):**
+    - Khắc phục số thứ tự đen mờ che poster: áp dụng typography gradient kim loại đa sắc (`#1 Gold`, `#2 Silver`, `#3 Bronze`, `#4-10 Frosted Chrome`) với viền nét `WebkitTextStroke` và drop shadow phát sáng.
+    - Bổ sung huy hiệu thứ hạng mini (`TOP #`) sang trọng ngay trên poster thẻ phim, dễ nhìn trên cả màn hình nhỏ và lớn.
+  - **Phân nhóm tập phim thông minh theo Tabs 25 tập (`VideoPlayer.tsx`):**
+    - Giải quyết cuộn dọc nặng nề trên mobile/desktop đối với các phim bộ dài tập (Anime, C-Drama 30 - 100+ tập).
+    - Tự động chia tabs dạng viên thuốc (`Tập 1 - 25`, `Tập 26 - 50`...), tự động chọn tab tương ứng với tập đang phát, không gây giật lag hay render thừa.
+  - **Chia sẻ phim gốc trên điện thoại (`MovieDetailModal.tsx`):**
+    - Tích hợp Web Share API (`navigator.share`) cho phép chia sẻ nhanh trực tiếp qua Zalo, Messenger, Telegram hoặc SMS trên điện thoại di động; tự động fallback về sao chép liên kết vào clipboard trên máy tính.
+  - **Nút truy cập nhanh Vòng Quay Phim:**
+    - Bổ sung nút "🎲 Vòng Quay Phim" trực tiếp vào hàng Category Chips dưới Hero Banner trang chủ để người dùng bấm quay ngay khi phân vân không biết xem gì.
+  - **Thiết kế lại Footer Tinh Gọn & Đẳng Cấp (`App.tsx`):**
+    - Bỏ hoàn toàn 3 khối hộp tính năng cồng kềnh (Luồng phát, PWA, Tủ phim) chiếm diện tích lớn và tạo cảm giác trang thương mại điện tử thay vì rạp chiếu phim trực tuyến.
+    - Chuyển sang phong cách footer tối giản, sang trọng (chuẩn streaming platform Netflix/Apple TV+), hiển thị slogan gọn gàng, hệ thống link danh mục đầy đủ (thêm TV Shows) và bản quyền nhẹ nhàng.
+
+- **Thiết kế lại toàn diện giao diện lấy cảm hứng UI/UX từ Netflix (`feat/frontend-ui-ux-optimization` - 2026-10-26):**
+  - **Hệ thống màu sắc & Phối màu chuẩn Netflix (`index.css`, `theme.ts`):**
+    - Nền giao diện chuyển sang màu đen điện ảnh Netflix nguyên bản `#141414`, kết hợp thẻ card nền `#181818` và viền tinh tế `border-white/[0.08]`.
+    - Màu chủ đạo mặc định là **Đỏ Netflix** `#E50914` rực rỡ với hiệu ứng ánh sáng đỏ `rgba(229, 9, 20, 0.45)`.
+    - Điểm tương thích TMDB chuyển sang định dạng phần trăm màu xanh lá Netflix đặc trưng `#46d369` (`XX% Phù hợp`).
+  - **Hero Banner phong cách Netflix Billboard (`HeroBanner.tsx`):**
+    - Thêm huy hiệu vuông đỏ chữ `N` (`bg-[#E50914]`) chuẩn phong cách Netflix Originals / Kicker.
+    - Huy hiệu Match Score (`XX% Phù hợp`) màu xanh lá và hộp độ tuổi `16+` viền xám mờ.
+    - Nút **"Phát"** chính thiết kế chuẩn Netflix: nền trắng muốt (`bg-white text-black font-extrabold hover:bg-white/85 shadow-2xl`), bo góc 4px (`rounded`).
+    - Nút **"Thông tin khác"** bán trong suốt (`bg-zinc-600/70 hover:bg-zinc-600/50 text-white font-bold backdrop-blur-md`).
+    - Các nút phụ (Lưu phim vào danh sách, Xem trailer) thiết kế dạng hình tròn viền outline mảnh tinh tế.
+    - Gradient đáy banner chuyển mượt mà xuống nền đen điện ảnh `#141414`.
+  - **Thanh cuộn phim & Thẻ phim chuẩn Netflix (`MovieRow.tsx`, `MovieCard.tsx`):**
+    - Thêm nút trượt bên hông (Side Paddle Sliders) toàn chiều cao (`group/row`, `w-10 sm:w-11 bg-black/60 hover:bg-black/90 text-white`) tự động xuất hiện khi rê chuột vào hàng, cho phép cuộn trượt mượt mà 1-click như trên Netflix desktop.
+    - Thẻ phim chuyển từ bo góc tròn lớn `rounded-2xl` sang phong cách điện ảnh `rounded-md sm:rounded-lg` sắc nét, nền thẻ `#181818`, badge chất lượng phim đỏ `#E50914`.
+    - Nút xem nhanh khi hover là nút tròn trắng chữ đen (`bg-white text-black shadow-2xl`).
+    - Thông tin chân thẻ hiển thị tỉ lệ phù hợp `% Phù hợp` màu xanh lá nếu có điểm đánh giá.
+  - **Cửa sổ xem trước phim phong cách Netflix Preview Modal (`MovieDetailModal.tsx`):**
+    - Khung modal nổi bật với nền tối `#181818`, nút phát chính chuyển thành nút bấm trắng to bản chữ đen (`Xem Phim`), các nút thao tác nhanh (Bookmark, Chia sẻ, Bộ sưu tập, Quét QR) dạng hình tròn tối giản.
+    - Dòng thông tin metadata chuẩn Netflix: Điểm `% Phù hợp` xanh lá, badge độ tuổi `16+`, badge chất lượng `HD`, năm phát hành, thời lượng và quốc gia.
+  - **Header & Thanh điều hướng Netflix Glass (`Navbar.tsx`, `NavbarLogo.tsx`, `DesktopNav.tsx`):**
+    - Thanh điều hướng tự động chuyển đổi hiệu ứng: trong suốt khi ở đầu trang (`scrollY <= 20`) và chuyển sang kính mờ tối màu sang trọng (`bg-[#141414]/95 backdrop-blur-md border-b border-white/[0.08]`) khi cuộn xuống.
+    - **Loại bỏ nút Bảng Màu (Theme Selector):** Gỡ bỏ hoàn toàn nút Palette gây hiểu nhầm khỏi thanh Header và Mobile Drawer để tinh gọn giao diện, cố định bản sắc thương hiệu Đỏ Netflix & Đen Điện Ảnh thống nhất 100%.
+  - **Kiểm thử & Chất lượng:**
+    - Đạt 76/76 tests Vitest frontend, `oxlint` 0 lỗi, TypeScript typecheck sạch sẽ, bundle production build hoàn tất an toàn.
+
+
 
 

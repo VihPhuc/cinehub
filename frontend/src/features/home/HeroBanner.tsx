@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Play, Info, Heart, Star, ChevronLeft, ChevronRight, Video, X } from 'lucide-react';
+import { Play, Info, Bookmark, Star, ChevronLeft, ChevronRight, Video, X } from 'lucide-react';
 import type { MovieItem, MovieDetail } from '@/shared/types';
 import { getImageUrl, prefetchMovieDetail, getMovieDetail, formatMovieTitle } from '@/shared/api';
 
@@ -122,7 +122,7 @@ export const HeroBanner: React.FC<Props> = ({
     'Full HD';
 
   return (
-    <div className="relative w-full h-[540px] sm:h-[640px] lg:h-[720px] overflow-hidden bg-[#07080d] select-none">
+    <div className="relative w-full h-[540px] sm:h-[640px] lg:h-[720px] overflow-hidden bg-[#141414] select-none">
       {/* Background Poster Image: Crisp, bright, high-contrast and 100% free of YouTube controls */}
       <div className="absolute inset-0">
         <img
@@ -136,22 +136,27 @@ export const HeroBanner: React.FC<Props> = ({
 
       {/* Cinematic Ambient Gradients:
           - Left: Deep, smooth protection for text and action dock
-          - Bottom: Soft fade into page background
+          - Bottom: Soft fade into Netflix dark background
           - Top: Subtle header fade for navbar readability
-          - Right: 100% crystal clear so characters and scene shine brightly
+          - Right: Crystal clear so characters and scene shine brightly
       */}
-      <div className="absolute inset-0 bg-gradient-to-r from-[#07080d]/90 via-[#07080d]/60 via-35% md:via-[#07080d]/25 to-transparent pointer-events-none" />
-      <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-[#07080d] via-[#07080d]/40 to-transparent pointer-events-none" />
-      <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-[#07080d]/60 via-transparent to-transparent pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-r from-[#141414]/95 via-[#141414]/70 via-35% md:via-[#141414]/25 to-transparent pointer-events-none" />
+      <div className="absolute inset-x-0 bottom-0 h-44 bg-gradient-to-t from-[#141414] via-[#141414]/60 to-transparent pointer-events-none" />
+      <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-[#141414]/75 via-transparent to-transparent pointer-events-none" />
 
       {/* Main Container: Full-width Cinematic Hero Info */}
       <div className="relative z-10 w-full max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 h-full flex items-end pb-16 sm:pb-20">
         {/* Hero Information */}
         <div className="flex-1 max-w-xl sm:max-w-2xl lg:max-w-3xl space-y-3.5 sm:space-y-4">
-          {/* Top Category Kicker */}
-          <p className="text-[11px] sm:text-xs font-extrabold uppercase tracking-[0.2em] text-white/90 drop-shadow-md">
-            {topKicker}
-          </p>
+          {/* Top Category Kicker with Netflix 'N' Logo */}
+          <div className="flex items-center gap-2">
+            <span className="w-5 h-5 rounded-sm bg-[#E50914] text-white font-black text-xs flex items-center justify-center tracking-tighter shadow-md">
+              N
+            </span>
+            <span className="text-[11px] sm:text-xs font-black uppercase tracking-[0.25em] text-zinc-300 drop-shadow-md">
+              {topKicker}
+            </span>
+          </div>
 
           {/* Main Title & English Origin Subtitle with Non-breaking Season Badge */}
           <div className="space-y-1 sm:space-y-1.5">
@@ -164,38 +169,41 @@ export const HeroBanner: React.FC<Props> = ({
               )}
             </h1>
             {current.origin_name && (
-              <p className="text-xs sm:text-sm md:text-base font-semibold text-amber-400/95 tracking-wide drop-shadow">
+              <p className="text-xs sm:text-sm md:text-base font-semibold text-zinc-300 tracking-wide drop-shadow">
                 {current.origin_name}
               </p>
             )}
           </div>
 
-          {/* Minimalist Outlined Metadata Badges */}
-          <div className="flex items-center flex-wrap gap-2 text-xs">
+          {/* Netflix-Style Metadata Row */}
+          <div className="flex items-center flex-wrap gap-2.5 text-xs">
+            {current.tmdb?.vote_average ? (
+              <span className="text-[#46d369] font-black text-xs sm:text-sm">
+                {Math.round(current.tmdb.vote_average * 10)}% Phù hợp
+              </span>
+            ) : null}
+            <span className="px-1.5 py-0.5 rounded border border-white/40 text-white/90 font-bold text-[10px] sm:text-xs">
+              16+
+            </span>
+            {episodeInfo && (
+              <span className="px-1.5 py-0.5 rounded border border-white/40 text-white/90 font-bold text-[10px] sm:text-xs">
+                {episodeInfo}
+              </span>
+            )}
             {current.year && (
-              <span className="px-2.5 py-0.5 rounded-md border border-white/30 bg-black/35 backdrop-blur-sm text-white/90 font-semibold text-[11px] sm:text-xs">
+              <span className="text-zinc-300 font-semibold text-xs sm:text-sm">
                 {current.year}
               </span>
             )}
             {countryName && (
-              <span className="px-2.5 py-0.5 rounded-md border border-white/30 bg-black/35 backdrop-blur-sm text-white/90 font-semibold text-[11px] sm:text-xs">
+              <span className="text-zinc-300 font-semibold text-xs sm:text-sm">
                 {countryName}
               </span>
             )}
-            {parsedTitle.season && (
-              <span className="px-2.5 py-0.5 rounded-md border border-amber-400/40 bg-amber-500/10 backdrop-blur-sm text-amber-300 font-bold text-[11px] sm:text-xs">
-                {parsedTitle.season}
-              </span>
-            )}
-            {episodeInfo && (
-              <span className="px-2.5 py-0.5 rounded-md border border-white/30 bg-black/35 backdrop-blur-sm text-white/90 font-semibold text-[11px] sm:text-xs">
-                {episodeInfo}
-              </span>
-            )}
             {current.tmdb?.vote_average ? (
-              <span className="px-2.5 py-0.5 rounded-md border border-amber-400/40 bg-black/35 backdrop-blur-sm text-amber-300 font-bold text-[11px] sm:text-xs flex items-center gap-1">
+              <span className="px-2 py-0.5 rounded bg-black/40 border border-amber-400/40 text-amber-300 font-bold text-[11px] flex items-center gap-1">
                 <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                {current.tmdb.vote_average.toFixed(1)} TMDB
+                {current.tmdb.vote_average.toFixed(1)}
               </span>
             ) : null}
           </div>
@@ -207,58 +215,61 @@ export const HeroBanner: React.FC<Props> = ({
             </p>
           )}
 
-          {/* Action Controls: Circular Play Button + Capsule Dock */}
-          <div className="flex items-center gap-3.5 pt-2 sm:pt-3">
-            {/* Big Circular Golden Play Button */}
+          {/* Netflix Billboard Action Controls */}
+          <div className="flex items-center gap-3 pt-2 sm:pt-3 flex-wrap">
+            {/* Netflix Big White Play Button */}
             <button
               type="button"
               onClick={() => onPlay(current)}
-              className="w-13 h-13 sm:w-16 sm:h-16 rounded-full bg-gradient-to-tr from-amber-500 via-amber-400 to-yellow-300 hover:brightness-110 active:scale-95 text-black shadow-xl shadow-amber-500/30 flex items-center justify-center cursor-pointer transition-all duration-300 hover:scale-105"
+              className="flex items-center justify-center gap-2.5 px-6 sm:px-8 py-2.5 sm:py-3 rounded bg-white hover:bg-white/85 text-black font-extrabold text-sm sm:text-base transition-all duration-200 hover:scale-105 active:scale-95 shadow-2xl cursor-pointer"
               aria-label={`Xem ngay phim ${movieTitle}`}
-              title="Xem Ngay"
+              title="Phát"
             >
-              <Play className="w-6 h-6 sm:w-7 sm:h-7 fill-black text-black ml-0.5" />
+              <Play className="w-5 h-5 sm:w-6 sm:h-6 fill-black text-black" />
+              <span>Phát</span>
             </button>
 
-            {/* Sleek Pill Capsule Dock (Matching Reference Image) */}
-            <div className="rounded-full bg-black/60 backdrop-blur-xl border border-white/20 px-3 sm:px-5 py-2 sm:py-2.5 flex items-center gap-3 sm:gap-5 shadow-2xl">
-              {/* Heart / Favorite */}
-              {onToggleFav && (
-                <button
-                  type="button"
-                  onClick={() => onToggleFav(current)}
-                  className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full text-zinc-300 hover:text-white hover:bg-white/10 transition-transform active:scale-90 cursor-pointer focus-visible:ring-2 focus-visible:ring-amber-400"
-                  aria-label={isFav ? 'Bỏ yêu thích' : 'Yêu thích'}
-                  title={isFav ? 'Bỏ yêu thích' : 'Yêu thích'}
-                >
-                  <Heart className={`w-5 h-5 transition-colors ${isFav ? 'fill-red-500 text-red-500' : 'text-white hover:text-red-400'}`} />
-                </button>
-              )}
+            {/* Netflix More Info Button */}
+            <button
+              type="button"
+              onClick={() => onInfo(current)}
+              className="flex items-center justify-center gap-2.5 px-5 sm:px-7 py-2.5 sm:py-3 rounded bg-zinc-600/70 hover:bg-zinc-600/50 text-white font-bold text-sm sm:text-base backdrop-blur-md transition-all duration-200 active:scale-95 border border-white/10 cursor-pointer"
+              aria-label={`Xem chi tiết phim ${movieTitle}`}
+              title="Thông tin khác"
+            >
+              <Info className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+              <span>Thông tin khác</span>
+            </button>
 
-              {/* Info */}
+            {/* Netflix Circle Action: Bookmark / My List */}
+            {onToggleFav && (
               <button
                 type="button"
-                onClick={() => onInfo(current)}
-                className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full text-zinc-300 hover:text-white hover:bg-white/10 transition-transform active:scale-90 cursor-pointer focus-visible:ring-2 focus-visible:ring-amber-400"
-                aria-label={`Xem chi tiết phim ${movieTitle}`}
-                title="Xem chi tiết"
+                onClick={() => onToggleFav(current)}
+                className={`w-11 h-11 min-w-[44px] min-h-[44px] rounded-full border-2 transition-all flex items-center justify-center cursor-pointer active:scale-90 ${
+                  isFav
+                    ? 'border-[#E50914] bg-[#E50914]/25 text-[#E50914]'
+                    : 'border-white/40 hover:border-white text-white hover:bg-white/10'
+                }`}
+                title={isFav ? 'Đã thêm vào Danh sách của tôi' : 'Thêm vào Danh sách của tôi'}
+                aria-label={isFav ? 'Bỏ lưu' : 'Lưu phim'}
               >
-                <Info className="w-5 h-5 text-white" />
+                <Bookmark className={`w-5 h-5 ${isFav ? 'fill-current' : ''}`} />
               </button>
+            )}
 
-              {/* Trailer Button */}
-              {trailerId && (
-                <button
-                  type="button"
-                  onClick={() => setShowTrailerModal(true)}
-                  className="w-11 h-11 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full text-zinc-300 hover:text-white hover:bg-white/10 transition-transform active:scale-90 cursor-pointer focus-visible:ring-2 focus-visible:ring-amber-400"
-                  aria-label="Xem trailer phim"
-                  title="Xem trailer"
-                >
-                  <Video className="w-5 h-5 text-amber-400 hover:text-amber-300" />
-                </button>
-              )}
-            </div>
+            {/* Netflix Circle Action: Trailer */}
+            {trailerId && (
+              <button
+                type="button"
+                onClick={() => setShowTrailerModal(true)}
+                className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-full border-2 border-white/40 hover:border-white text-white hover:bg-white/10 transition-all flex items-center justify-center cursor-pointer active:scale-90"
+                title="Xem Trailer"
+                aria-label="Xem Trailer"
+              >
+                <Video className="w-5 h-5 text-amber-400" />
+              </button>
+            )}
           </div>
         </div>
       </div>
