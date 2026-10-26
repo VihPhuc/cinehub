@@ -20,52 +20,131 @@ Mình không trình bày dự án này như code tự viết tay. Trọng tâm h
 - Tái hiện và sửa lỗi.
 - Viết test và tập giải thích kiến trúc.
 
-## Chạy local
+## Hướng dẫn chạy dự án
 
-Yêu cầu Node.js 22+ (khuyến nghị) và npm.
+### 1. Yêu cầu hệ thống
+- **Node.js**: Phiên bản 20+ hoặc 22+ (khuyến nghị Node 22+).
+- **Trình quản lý gói**: `npm` đi kèm với Node.js.
+
+### 2. Cài đặt Dependencies
+Cài đặt toàn bộ thư viện cần thiết cho cả Frontend và Backend từ thư mục gốc của dự án:
 
 ```bash
 npm ci --prefix frontend
 npm ci --prefix backend
-npm run dev           # web http://localhost:5173 + API http://localhost:3001
-npm run dev:web       # chỉ frontend
-npm run dev:api       # NestJS API ở http://localhost:3001
-npm run build:web     # tsc -b + vite build -> frontend/dist/
+```
+
+> **Lưu ý**: Nếu clone dự án lần đầu và cần cài mới dependencies, bạn cũng có thể chạy `npm install --prefix frontend` và `npm install --prefix backend`.
+
+### 3. Cấu hình biến môi trường (`.env`)
+
+#### Cấu hình Frontend (Khuyến nghị):
+Sao chép file mẫu `.env.example` trong thư mục `frontend/` thành `.env.local`:
+```bash
+# Trên Windows PowerShell:
+Copy-Item frontend/.env.example frontend/.env.local
+
+# Hoặc trên Git Bash / macOS / Linux:
+cp frontend/.env.example frontend/.env.local
+```
+
+Trong file `frontend/.env.local`:
+- **Chế độ kết nối Backend CineHub (Khuyên dùng - Chuẩn Normalized API v1)**:
+  ```dotenv
+  VITE_API_BASE_URL=http://localhost:3001/api/v1
+  ```
+  *(Chế độ này cung cấp đầy đủ thông tin chuẩn hóa `updatedAt`, phân trang, sắp xếp và bộ lọc nâng cao từ server).*
+- **Chế độ Compat (Proxy định dạng thô PhimAPI)**:
+  ```dotenv
+  VITE_API_BASE_URL=http://localhost:3001/api/compat
+  ```
+- **Chế độ Standalone (Frontend độc lập, không cần bật Backend)**:
+  Để trống biến này hoặc không tạo file `.env.local`, frontend sẽ tự động gọi trực tiếp nguồn API công khai `https://phimapi.com`.
+
+#### Cấu hình Backend (Tùy chọn):
+Nếu bạn muốn tùy chỉnh cấu hình backend (mặc định đã sẵn sàng chạy ở cổng 3001):
+```bash
+# Windows PowerShell:
+Copy-Item backend/.env.example backend/.env
+# Hoặc Bash:
+cp backend/.env.example backend/.env
+```
+
+---
+
+### 4. Khởi chạy dự án
+
+#### Cách 1: Chạy Fullstack đồng thời cả Web và API (Khuyên dùng nhất)
+```bash
+npm run dev
+```
+Lệnh này sử dụng script điều phối khởi chạy song song 2 dịch vụ:
+- 🌐 **Frontend Web (Vite + React)**: [http://localhost:5173](http://localhost:5173)
+- 🚀 **Backend API (NestJS)**: [http://localhost:3001](http://localhost:3001)
+  - 📖 Trang tài liệu tương tác Swagger: [http://localhost:3001/api/docs](http://localhost:3001/api/docs)
+  - 🩺 Kiểm tra trạng thái máy chủ (Health): [http://localhost:3001/api/health](http://localhost:3001/api/health)
+
+#### Cách 2: Chỉ chạy Frontend
+```bash
+npm run dev:web
+```
+Ứng dụng web mở tại [http://localhost:5173](http://localhost:5173). Nếu backend không bật, frontend vẫn xem phim bình thường qua API dự phòng.
+
+#### Cách 3: Chỉ chạy Backend API
+```bash
+npm run dev:api
+# Hoặc: cd backend && npm run start:dev
+```
+Server NestJS khởi động tại [http://localhost:3001](http://localhost:3001).
+
+---
+
+### 5. Khởi tạo Catalog Index cho Backend (Tùy chọn)
+Để kích hoạt tính năng Discovery & Facet filter toàn bộ danh mục (`/api/v1/discover`), chạy lệnh tải và đồng bộ chỉ mục phim cục bộ:
+```bash
+npm --prefix backend run index:refresh
+```
+*(Sau khi tạo file index snapshot, khởi động lại backend để nạp dữ liệu vào bộ nhớ).*
+
+---
+
+### 6. Đóng gói & Chạy thử Production (Build & Preview)
+```bash
+# Đóng gói frontend -> frontend/dist/
+npm run build:web
+
+# Đóng gói backend -> backend/dist/
+npm run build:api
+
+# Xem trước bản build production của Frontend trên môi trường local (port 4173)
 npm run preview
 ```
+
+---
 
 ## Kiểm tra chất lượng
 
 ```bash
-npm run verify         # lint + test + build + guard cho cả frontend/backend
-npm run test:web       # Vitest frontend
-npm run test:api       # Jest unit + e2e backend
-npm run lint           # Oxlint frontend + backend
-npm run check:bundle   # chặn hls.js bị preload lại vào bundle đầu
-npm run check:deploy   # kiểm tra _headers/_redirects trong frontend/dist
-npm run check:mojibake # phát hiện lỗi encoding trong source
+npm run verify         # Kiểm tra toàn diện: lint + test + build + guard cho cả frontend và backend
+npm run test:web       # Chạy Vitest cho frontend (76 tests)
+npm run test:api       # Chạy Jest unit + e2e cho backend (109 tests)
+npm run lint           # Kiểm tra quy chuẩn code với Oxlint (frontend + backend)
+npm run check:bundle   # Guard: Chặn hls.js bị preload sai vào bundle ban đầu
+npm run check:deploy   # Guard: Kiểm tra _headers và _redirects bảo mật trong dist
+npm run check:mojibake # Guard: Phát hiện lỗi encoding ký tự lạ trong mã nguồn
 ```
 
-CI tại `.github/workflows/verify.yml` cài đặt và kiểm tra cả hai package `frontend/` và `backend/` khi push/PR.
+CI tại `.github/workflows/verify.yml` tự động cài đặt và kiểm tra toàn bộ các điều kiện trên khi có push/PR mới.
 
-## Backend (phase 1)
+## Thông tin Backend & Hợp nhất API
 
-Backend NestJS nằm trong `backend/`, cung cấp proxy/cache PhimAPI và API chuẩn hóa.
+Backend NestJS nằm trong `backend/`, cung cấp proxy/cache thông minh cho PhimAPI và hệ thống API chuẩn hóa:
+- **Normalized API (Khuyên dùng)**: `/api/v1/*` (xem chi tiết tại [docs/backend-api.md](docs/backend-api.md))
+- **Compat API**: `/api/compat/*` (giữ nguyên cấu trúc dữ liệu thô gốc của PhimAPI)
+- **Tài liệu Swagger**: [http://localhost:3001/api/docs](http://localhost:3001/api/docs)
+- **Kiểm tra sức khỏe**: [http://localhost:3001/api/health](http://localhost:3001/api/health)
 
-```bash
-cd backend
-npm ci
-npm run start:dev
-```
-
-- Health: `http://localhost:3001/api/health`
-- Swagger: `http://localhost:3001/api/docs`
-- Frontend compat base: `http://localhost:3001/api/compat`
-- Contract cho frontend: `docs/backend-api.md`
-
-Backend không proxy HLS/iframe; player vẫn dùng URL stream trực tiếp. Đặt
-`VITE_API_BASE_URL=http://localhost:3001/api/compat` để frontend đi qua backend;
-nếu không, frontend vẫn fallback về PhimAPI trực tiếp.
+Backend không proxy luồng video HLS/iframe; trình phát VideoPlayer vẫn kết nối trực tiếp đến CDN stream để đảm bảo tốc độ tối đa.
 
 ## Cấu trúc chính
 
@@ -105,9 +184,9 @@ Các tham số được hỗ trợ: `tab`, `genre`, `country`, `q`, `page`, `inf
   - `cinehub-images-v1` — ảnh, giới hạn số entry
 - Khi build thay đổi asset, bump shell cache trong `frontend/public/sw.js`.
 
-> Backend có compat (`/api/compat/*`) và normalized (`/api/v1/*`) routes. Frontend
-> mặc định vẫn gọi trực tiếp `https://phimapi.com` cho đến khi đặt
-> `VITE_API_BASE_URL=http://localhost:3001/api/compat`; xem `docs/backend-api.md` để tích hợp.
+> Backend cung cấp cả chuẩn normalized (`/api/v1/*` — khuyến nghị) và compat (`/api/compat/*`). Frontend
+> mặc định gọi trực tiếp `https://phimapi.com` cho đến khi cấu hình
+> `VITE_API_BASE_URL=http://localhost:3001/api/v1` (hoặc `/api/compat`); xem `docs/backend-api.md` để tích hợp.
 
 ## Bảo mật
 
