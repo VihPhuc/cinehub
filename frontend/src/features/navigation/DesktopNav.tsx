@@ -36,10 +36,10 @@ function NavDropdown({
     <div className="relative shrink-0" onMouseLeave={onClose}>
       <button
         onClick={onToggle}
-        className={`h-9 px-2.5 2xl:px-3 text-xs 2xl:text-sm whitespace-nowrap shrink-0 inline-flex items-center gap-1 transition-colors cursor-pointer rounded-lg ${
+        className={`h-9 px-2.5 2xl:px-3 text-xs 2xl:text-sm whitespace-nowrap shrink-0 inline-flex items-center gap-1 transition-colors cursor-pointer rounded-md ${
           active
-            ? 'text-white font-bold relative after:absolute after:bottom-0 after:left-2 after:right-2 after:h-0.5 after:bg-gradient-to-r after:from-red-500 after:via-rose-500 after:to-amber-500 after:rounded-full after:shadow-[0_0_10px_rgba(239,68,68,0.9)]'
-            : 'text-zinc-400 hover:text-white font-medium hover:bg-white/[0.05]'
+            ? 'text-white font-bold relative after:absolute after:bottom-0 after:left-2 after:right-2 after:h-0.5 after:bg-[#E50914] after:rounded-full after:shadow-[0_0_8px_rgba(229,9,20,0.8)]'
+            : 'text-zinc-300 hover:text-white font-medium hover:bg-white/[0.05]'
         }`}
       >
         <span>{label}</span>
@@ -47,7 +47,7 @@ function NavDropdown({
       </button>
       {open && (
         <div className={`absolute top-full left-0 pt-2 ${widthClass} z-50 animate-in fade-in slide-in-from-top-2 duration-200`}>
-          <div className="glass-dropdown rounded-2xl p-2.5 grid grid-cols-2 gap-1">
+          <div className="bg-[#181818] border border-white/[0.12] shadow-2xl rounded-xl p-2.5 grid grid-cols-2 gap-1">
             <div className="col-span-2 px-2 py-1 text-[11px] font-bold text-zinc-400 uppercase tracking-wider border-b border-white/[0.08] mb-1">
               {title}
             </div>
@@ -58,9 +58,9 @@ function NavDropdown({
                   onSelect(item.slug, item.name);
                   onClose();
                 }}
-                className="flex items-center gap-2 text-left text-xs px-2.5 py-2 rounded-lg hover:bg-red-600/20 hover:text-red-300 text-zinc-300 transition-colors cursor-pointer group"
+                className="flex items-center gap-2 text-left text-xs px-2.5 py-2 rounded-md hover:bg-[#E50914]/20 hover:text-white text-zinc-300 transition-colors cursor-pointer group"
               >
-                <span className="w-1.5 h-1.5 rounded-full bg-zinc-600 group-hover:bg-red-500 transition-colors shrink-0" />
+                <span className="w-1.5 h-1.5 rounded-full bg-zinc-600 group-hover:bg-[#E50914] transition-colors shrink-0" />
                 <span className="truncate">{item.name}</span>
               </button>
             ))}
@@ -87,10 +87,10 @@ export function DesktopNav({
           <button
             key={t.id}
             onClick={() => onSelectTab(t.id)}
-            className={`relative h-9 px-2.5 2xl:px-3 text-xs 2xl:text-sm whitespace-nowrap shrink-0 transition-colors duration-200 cursor-pointer inline-flex items-center justify-center rounded-lg ${
+            className={`relative h-9 px-2.5 2xl:px-3 text-xs 2xl:text-sm whitespace-nowrap shrink-0 transition-colors duration-200 cursor-pointer inline-flex items-center justify-center rounded-md ${
               isActive
-                ? 'text-white font-bold after:absolute after:bottom-0 after:left-2 after:right-2 after:h-0.5 after:bg-gradient-to-r after:from-red-500 after:via-rose-500 after:to-amber-500 after:rounded-full after:shadow-[0_0_10px_rgba(239,68,68,0.9)]'
-                : 'text-zinc-400 hover:text-white font-medium hover:bg-white/[0.05]'
+                ? 'text-white font-bold after:absolute after:bottom-0 after:left-2 after:right-2 after:h-0.5 after:bg-[#E50914] after:rounded-full after:shadow-[0_0_8px_rgba(229,9,20,0.8)]'
+                : 'text-zinc-300 hover:text-white font-medium hover:bg-white/[0.05]'
             }`}
           >
             {t.id === 'hoat-hinh' ? (
@@ -130,10 +130,10 @@ export function DesktopNav({
 
       <button
         onClick={() => onSelectTab('library')}
-        className={`h-9 px-2.5 2xl:px-3 text-xs 2xl:text-sm whitespace-nowrap shrink-0 inline-flex items-center gap-1.5 rounded-lg transition-colors cursor-pointer ${
+        className={`h-9 px-2.5 2xl:px-3 text-xs 2xl:text-sm whitespace-nowrap shrink-0 inline-flex items-center gap-1.5 rounded-md transition-colors cursor-pointer ${
           activeTab === 'library'
-            ? 'text-white font-bold relative after:absolute after:bottom-0 after:left-2 after:right-2 after:h-0.5 after:bg-gradient-to-r after:from-red-500 after:via-rose-500 after:to-amber-500 after:rounded-full after:shadow-[0_0_10px_rgba(239,68,68,0.9)]'
-            : 'text-zinc-400 hover:text-white font-medium hover:bg-white/[0.05]'
+            ? 'text-white font-bold relative after:absolute after:bottom-0 after:left-2 after:right-2 after:h-0.5 after:bg-[#E50914] after:rounded-full after:shadow-[0_0_8px_rgba(229,9,20,0.8)]'
+            : 'text-zinc-300 hover:text-white font-medium hover:bg-white/[0.05]'
         }`}
       >
         <Bookmark className="w-3.5 h-3.5 shrink-0" />

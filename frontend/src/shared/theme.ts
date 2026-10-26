@@ -14,11 +14,11 @@ export const THEME_STORAGE_KEY = 'cinehub_theme_accent';
 export const THEME_OPTIONS: ThemeOption[] = [
   {
     id: 'ruby',
-    name: 'Đỏ Ruby',
+    name: 'Đỏ Netflix',
     badge: 'Mặc định',
-    colorHex: '#e11d48',
-    gradient: 'from-red-600 via-rose-600 to-amber-500',
-    glowClass: 'shadow-rose-600/30',
+    colorHex: '#E50914',
+    gradient: 'from-[#E50914] via-red-600 to-rose-600',
+    glowClass: 'shadow-red-600/35',
   },
   {
     id: 'amber',

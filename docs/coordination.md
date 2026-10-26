@@ -191,7 +191,33 @@ Kiểm tra thủ công bằng Chrome headless + CDP trên `vite preview`:
   - **Thiết kế lại Footer Tinh Gọn & Đẳng Cấp (`App.tsx`):**
     - Bỏ hoàn toàn 3 khối hộp tính năng cồng kềnh (Luồng phát, PWA, Tủ phim) chiếm diện tích lớn và tạo cảm giác trang thương mại điện tử thay vì rạp chiếu phim trực tuyến.
     - Chuyển sang phong cách footer tối giản, sang trọng (chuẩn streaming platform Netflix/Apple TV+), hiển thị slogan gọn gàng, hệ thống link danh mục đầy đủ (thêm TV Shows) và bản quyền nhẹ nhàng.
-    - Tối ưu padding an toàn (`pt-8 pb-28 md:pb-8`) và vị trí nút Scroll-to-Top / Toast (`bottom-[5.25rem]`), đảm bảo không bị đè bởi thanh `MobileBottomNav` trên smartphone.
+
+- **Thiết kế lại toàn diện giao diện lấy cảm hứng UI/UX từ Netflix (`feat/frontend-ui-ux-optimization` - 2026-10-26):**
+  - **Hệ thống màu sắc & Phối màu chuẩn Netflix (`index.css`, `theme.ts`):**
+    - Nền giao diện chuyển sang màu đen điện ảnh Netflix nguyên bản `#141414`, kết hợp thẻ card nền `#181818` và viền tinh tế `border-white/[0.08]`.
+    - Màu chủ đạo mặc định là **Đỏ Netflix** `#E50914` rực rỡ với hiệu ứng ánh sáng đỏ `rgba(229, 9, 20, 0.45)`.
+    - Điểm tương thích TMDB chuyển sang định dạng phần trăm màu xanh lá Netflix đặc trưng `#46d369` (`XX% Phù hợp`).
+  - **Hero Banner phong cách Netflix Billboard (`HeroBanner.tsx`):**
+    - Thêm huy hiệu vuông đỏ chữ `N` (`bg-[#E50914]`) chuẩn phong cách Netflix Originals / Kicker.
+    - Huy hiệu Match Score (`XX% Phù hợp`) màu xanh lá và hộp độ tuổi `16+` viền xám mờ.
+    - Nút **"Phát"** chính thiết kế chuẩn Netflix: nền trắng muốt (`bg-white text-black font-extrabold hover:bg-white/85 shadow-2xl`), bo góc 4px (`rounded`).
+    - Nút **"Thông tin khác"** bán trong suốt (`bg-zinc-600/70 hover:bg-zinc-600/50 text-white font-bold backdrop-blur-md`).
+    - Các nút phụ (Lưu phim vào danh sách, Xem trailer) thiết kế dạng hình tròn viền outline mảnh tinh tế.
+    - Gradient đáy banner chuyển mượt mà xuống nền đen điện ảnh `#141414`.
+  - **Thanh cuộn phim & Thẻ phim chuẩn Netflix (`MovieRow.tsx`, `MovieCard.tsx`):**
+    - Thêm nút trượt bên hông (Side Paddle Sliders) toàn chiều cao (`group/row`, `w-10 sm:w-11 bg-black/60 hover:bg-black/90 text-white`) tự động xuất hiện khi rê chuột vào hàng, cho phép cuộn trượt mượt mà 1-click như trên Netflix desktop.
+    - Thẻ phim chuyển từ bo góc tròn lớn `rounded-2xl` sang phong cách điện ảnh `rounded-md sm:rounded-lg` sắc nét, nền thẻ `#181818`, badge chất lượng phim đỏ `#E50914`.
+    - Nút xem nhanh khi hover là nút tròn trắng chữ đen (`bg-white text-black shadow-2xl`).
+    - Thông tin chân thẻ hiển thị tỉ lệ phù hợp `% Phù hợp` màu xanh lá nếu có điểm đánh giá.
+  - **Cửa sổ xem trước phim phong cách Netflix Preview Modal (`MovieDetailModal.tsx`):**
+    - Khung modal nổi bật với nền tối `#181818`, nút phát chính chuyển thành nút bấm trắng to bản chữ đen (`Xem Phim`), các nút thao tác nhanh (Bookmark, Chia sẻ, Bộ sưu tập, Quét QR) dạng hình tròn tối giản.
+    - Dòng thông tin metadata chuẩn Netflix: Điểm `% Phù hợp` xanh lá, badge độ tuổi `16+`, badge chất lượng `HD`, năm phát hành, thời lượng và quốc gia.
+  - **Header & Thanh điều hướng Netflix Glass (`Navbar.tsx`, `NavbarLogo.tsx`, `DesktopNav.tsx`):**
+    - Thanh điều hướng tự động chuyển đổi hiệu ứng: trong suốt khi ở đầu trang (`scrollY <= 20`) và chuyển sang kính mờ tối màu sang trọng (`bg-[#141414]/95 backdrop-blur-md border-b border-white/[0.08]`) khi cuộn xuống.
+    - Logo `CINEHUB`: chữ `CINE` màu trắng sắc sảo, chữ `HUB` đỏ rực rỡ `#E50914`, tab đang chọn có thanh gạch chân màu đỏ Netflix phát sáng.
+  - **Kiểm thử & Chất lượng:**
+    - Đạt 76/76 tests Vitest frontend, `oxlint` 0 lỗi, TypeScript typecheck sạch sẽ, bundle production build hoàn tất an toàn.
+
 
 
 

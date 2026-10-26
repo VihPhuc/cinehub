@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
 import DOMPurify from 'dompurify';
-import { X, Play, Bookmark, Star, Calendar, Clock, Loader2, Share2, Check, Video, Users, User, AlertCircle, RefreshCw, QrCode, Smartphone, Search, FolderPlus, FolderCheck, Plus } from 'lucide-react';
+import { X, Play, Bookmark, Calendar, Clock, Loader2, Share2, Check, Video, Users, User, AlertCircle, RefreshCw, QrCode, Smartphone, Search, FolderPlus, FolderCheck, Plus } from 'lucide-react';
 import type { MovieDetail, MovieItem } from '@/shared/types';
 import { getImageUrl, getMovieDetail, getGenreMovies, formatMovieTitle } from '@/shared/api';
 import { isEpisodeCompleted, getCollections, toggleMovieInCollection, createCollection } from '@/shared/storage';
@@ -309,7 +309,7 @@ export const MovieDetailModal: React.FC<Props> = ({
       }}
       className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-2xl overflow-y-auto animate-in fade-in duration-200"
     >
-      <div ref={modalPanelRef} className="relative w-full max-w-4xl bg-[#0c0e16]/95 border border-white/[0.12] rounded-3xl shadow-2xl overflow-hidden my-auto max-h-[92vh] flex flex-col">
+      <div ref={modalPanelRef} className="relative w-full max-w-4xl bg-[#181818] border border-white/[0.12] rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden my-auto max-h-[92vh] flex flex-col">
         {/* Close button */}
         <button
           onClick={onClose}
@@ -326,30 +326,30 @@ export const MovieDetailModal: React.FC<Props> = ({
             alt={movie.name}
             className="w-full h-full object-cover object-center filter brightness-[0.35] scale-105"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0c0e16] via-[#0c0e16]/60 to-transparent" />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#0c0e16] via-[#0c0e16]/40 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#181818] via-[#181818]/60 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#181818] via-[#181818]/40 to-transparent" />
 
           {/* Floating Poster & Main Info */}
           <div className="absolute bottom-5 left-5 right-5 flex items-end gap-4 sm:gap-5 z-20">
             <img
               src={poster}
               alt={movie.name}
-              className="w-28 sm:w-32 aspect-[2/3] object-cover rounded-2xl border-2 border-white/20 shadow-2xl hidden sm:block shrink-0"
+              className="w-28 sm:w-32 aspect-[2/3] object-cover rounded-xl border border-white/20 shadow-2xl hidden sm:block shrink-0"
             />
             <div className="flex-1 space-y-2">
               <div className="flex flex-wrap items-center gap-1.5">
                 {movie.quality && (
-                  <span className="px-2.5 py-0.5 rounded-md text-[11px] font-black uppercase tracking-wider bg-gradient-to-r from-red-600 to-rose-600 text-white shadow-md">
+                  <span className="px-2 py-0.5 rounded text-[11px] font-black uppercase tracking-wider bg-[#E50914] text-white shadow-md">
                     {movie.quality}
                   </span>
                 )}
                 {movie.lang && (
-                  <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-black/60 backdrop-blur-md text-zinc-200 border border-white/10">
+                  <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-black/70 backdrop-blur-md text-zinc-200 border border-white/10">
                     {movie.lang}
                   </span>
                 )}
                 {movie.episode_current && (
-                  <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-black/80 backdrop-blur-md text-amber-300 border border-amber-500/30">
+                  <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-black/85 backdrop-blur-md text-amber-300 border border-amber-500/30">
                     {movie.episode_current}
                   </span>
                 )}
@@ -368,80 +368,83 @@ export const MovieDetailModal: React.FC<Props> = ({
 
         {/* Modal Scrollable Body */}
         <div className="p-5 sm:p-7 overflow-y-auto space-y-5">
-          {/* Action Buttons Row */}
+          {/* Netflix Action Buttons Row */}
           <div className="flex items-center gap-3 flex-wrap">
+            {/* Netflix Big White Play Button */}
             <button
               onClick={() => onWatch(movie, selectedServerIdx, 0)}
-              className="flex items-center gap-2 px-7 py-3 rounded-xl bg-gradient-to-r from-red-600 via-rose-600 to-red-600 hover:from-red-500 hover:to-rose-500 text-white font-black text-sm glow-red shadow-xl transition-all hover:scale-105 active:scale-95 cursor-pointer focus-visible:ring-2 focus-visible:ring-red-400"
+              className="flex items-center gap-2.5 px-8 py-3 rounded bg-white hover:bg-white/85 text-black font-extrabold text-sm sm:text-base shadow-2xl transition-all hover:scale-105 active:scale-95 cursor-pointer focus-visible:ring-2 focus-visible:ring-white"
               aria-label={`Xem ngay phim ${formatMovieTitle(movie.name)}`}
             >
-              <Play className="w-4 h-4 fill-current" />
-              Xem Phim Ngay
+              <Play className="w-5 h-5 fill-black text-black" />
+              <span>Xem Phim</span>
             </button>
+
+            {/* Netflix Trailer Button */}
             {getYouTubeEmbedUrl(movie.trailer_url) && (
               <button
                 onClick={() => setShowTrailer(!showTrailer)}
-                className={`flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold border transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-red-400 ${
+                className={`flex items-center gap-2 px-5 py-3 rounded text-sm font-bold border transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-white ${
                   showTrailer
-                    ? 'bg-gradient-to-r from-red-600 to-rose-600 text-white border-red-500 shadow-md shadow-red-600/30'
-                    : 'glass-pill text-zinc-200 border-white/10 hover:bg-white/15'
+                    ? 'bg-white/20 text-white border-white/40'
+                    : 'bg-zinc-600/70 hover:bg-zinc-600/50 text-white border-white/10 backdrop-blur-md'
                 }`}
               >
-                <Video className="w-4 h-4 text-red-400" />
-                {showTrailer ? 'Đóng Trailer' : 'Xem Trailer'}
+                <Video className="w-4 h-4 text-amber-400" />
+                <span>{showTrailer ? 'Đóng Trailer' : 'Trailer'}</span>
               </button>
             )}
+
+            {/* Circle Action: Bookmark / My List */}
             <button
               onClick={() => onToggleFav(movie)}
-              className={`flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold border transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-red-400 ${
+              className={`w-11 h-11 min-w-[44px] min-h-[44px] rounded-full border-2 transition-all flex items-center justify-center cursor-pointer active:scale-90 ${
                 isFav
-                  ? 'bg-red-600/20 text-red-400 border-red-500/40 shadow-sm shadow-red-500/20'
-                  : 'glass-pill text-zinc-200 border-white/10 hover:bg-white/15'
+                  ? 'border-[#E50914] bg-[#E50914]/25 text-[#E50914]'
+                  : 'border-white/40 hover:border-white text-white hover:bg-white/10'
               }`}
+              title={isFav ? 'Đã thêm vào Danh sách của tôi' : 'Thêm vào Danh sách của tôi'}
+              aria-label={isFav ? 'Bỏ lưu' : 'Lưu phim'}
             >
-              <Bookmark className={`w-4 h-4 ${isFav ? 'fill-current' : ''}`} />
-              {isFav ? 'Đã Lưu Vào Tủ' : 'Lưu Vào Tủ Phim'}
+              <Bookmark className={`w-5 h-5 ${isFav ? 'fill-current' : ''}`} />
             </button>
+
+            {/* Circle Action: Share */}
             <button
               onClick={handleShare}
-              className={`flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold border transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-white ${
-                copied
-                  ? 'bg-emerald-600/20 text-emerald-400 border-emerald-500/40'
-                  : 'glass-pill text-zinc-300 border-white/10 hover:bg-white/15 hover:text-white'
-              }`}
-              title="Sao chép liên kết thông tin phim"
+              className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-full border-2 border-white/40 hover:border-white text-white hover:bg-white/10 transition-all flex items-center justify-center cursor-pointer active:scale-90"
+              title={copied ? 'Đã sao chép liên kết' : 'Chia sẻ phim'}
+              aria-label="Chia sẻ phim"
             >
-              {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Share2 className="w-4 h-4" />}
-              {copied ? 'Đã Sao Chép Link' : 'Chia Sẻ'}
+              {copied ? <Check className="w-5 h-5 text-emerald-400" /> : <Share2 className="w-5 h-5" />}
             </button>
+
+            {/* Circle Action: Collection */}
             <button
               onClick={() => setShowCollectionPicker(!showCollectionPicker)}
-              className={`flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold border transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-amber-400 ${
+              className={`w-11 h-11 min-w-[44px] min-h-[44px] rounded-full border-2 transition-all flex items-center justify-center cursor-pointer active:scale-90 ${
                 movieCollectionIds.length > 0
-                  ? 'bg-amber-600/20 text-amber-300 border-amber-500/40 shadow-sm shadow-amber-500/20'
-                  : 'glass-pill text-zinc-200 border-white/10 hover:bg-white/15'
+                  ? 'border-amber-400 bg-amber-500/20 text-amber-300'
+                  : 'border-white/40 hover:border-white text-white hover:bg-white/10'
               }`}
-              title="Thêm hoặc xóa phim khỏi Bộ sưu tập cá nhân"
+              title={movieCollectionIds.length > 0 ? `Trong ${movieCollectionIds.length} Bộ sưu tập` : 'Thêm vào Bộ sưu tập'}
+              aria-label="Quản lý bộ sưu tập"
             >
               {movieCollectionIds.length > 0 ? (
-                <FolderCheck className="w-4 h-4 text-amber-400" />
+                <FolderCheck className="w-5 h-5 text-amber-400" />
               ) : (
-                <FolderPlus className="w-4 h-4 text-zinc-400" />
+                <FolderPlus className="w-5 h-5 text-zinc-300" />
               )}
-              <span>
-                {movieCollectionIds.length > 0
-                  ? `Trong ${movieCollectionIds.length} Bộ Sưu Tập`
-                  : 'Bộ Sưu Tập'}
-              </span>
             </button>
+
+            {/* Circle Action: QR Mobile */}
             <button
               onClick={() => setShowQrModal(true)}
-              className="flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold border glass-pill text-amber-300 border-amber-500/30 hover:border-amber-500/60 hover:bg-amber-500/10 transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-amber-400"
+              className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-full border-2 border-white/40 hover:border-white text-white hover:bg-white/10 transition-all flex items-center justify-center cursor-pointer active:scale-90"
               title="Quét mã QR để xem ngay trên điện thoại di động"
-              aria-label="Quét mã QR xem trên điện thoại di động"
+              aria-label="Quét mã QR xem trên điện thoại"
             >
-              <QrCode className="w-4 h-4 text-amber-400" />
-              <span>Xem Trên Mobile (QR)</span>
+              <QrCode className="w-5 h-5 text-zinc-300" />
             </button>
           </div>
 
@@ -549,24 +552,29 @@ export const MovieDetailModal: React.FC<Props> = ({
             </div>
           )}
 
-          {/* Quick Meta Info Badges */}
-          <div className="flex flex-wrap gap-4 sm:gap-6 text-xs text-zinc-300 border-y border-white/[0.08] py-3.5">
+          {/* Quick Meta Info Badges (Netflix Style) */}
+          <div className="flex flex-wrap items-center gap-3 sm:gap-5 text-xs text-zinc-300 border-y border-white/[0.08] py-3.5">
+            {movie.tmdb?.vote_average ? (
+              <span className="text-[#46d369] font-black text-sm">
+                {Math.round(movie.tmdb.vote_average * 10)}% Phù hợp
+              </span>
+            ) : null}
+            <span className="px-1.5 py-0.5 rounded border border-white/40 text-white/90 font-bold text-[11px]">
+              16+
+            </span>
+            <span className="px-1.5 py-0.5 rounded border border-white/40 text-white/90 font-bold text-[11px]">
+              HD
+            </span>
             {movie.year && (
-              <span className="flex items-center gap-1.5 font-semibold">
-                <Calendar className="w-4 h-4 text-zinc-400" /> {movie.year}
+              <span className="flex items-center gap-1 font-semibold text-zinc-300">
+                <Calendar className="w-3.5 h-3.5 text-zinc-400" /> {movie.year}
               </span>
             )}
             {movie.time && (
-              <span className="flex items-center gap-1.5 font-semibold">
-                <Clock className="w-4 h-4 text-zinc-400" /> {movie.time}
+              <span className="flex items-center gap-1 font-semibold text-zinc-300">
+                <Clock className="w-3.5 h-3.5 text-zinc-400" /> {movie.time}
               </span>
             )}
-            {movie.tmdb?.vote_average ? (
-              <span className="flex items-center gap-1 text-amber-400 font-bold">
-                <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-                {movie.tmdb.vote_average.toFixed(1)} TMDB
-              </span>
-            ) : null}
             {movie.country && (
               <span className="font-medium text-zinc-400">
                 Quốc gia: <strong className="text-zinc-200">{movie.country.map((c) => c.name).join(', ')}</strong>
