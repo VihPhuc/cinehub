@@ -7,6 +7,9 @@ export interface UrlState {
   selectedSlug: string | null;
   watchSlug: string | null;
   watchEpIdx: number;
+  sortFilter?: string;
+  yearFilter?: string;
+  ratingFilter?: string;
 }
 
 const MAX_PAGE = 5000;
@@ -58,6 +61,10 @@ export function parseUrlState(search: string): UrlState {
   if (activeTab === 'search' && !query) activeTab = 'home';
   if (!KNOWN_TABS.has(activeTab)) activeTab = 'home';
 
+  const sortFilter = params.get('sort')?.trim() || undefined;
+  const yearFilter = params.get('year')?.trim() || undefined;
+  const ratingFilter = params.get('rating')?.trim() || undefined;
+
   return {
     activeTab,
     genreFilter,
@@ -67,6 +74,9 @@ export function parseUrlState(search: string): UrlState {
     selectedSlug: params.get('info')?.trim() || null,
     watchSlug: params.get('watch')?.trim() || null,
     watchEpIdx: parseBoundedInt(params.get('ep'), 0, 0, MAX_EPISODE),
+    sortFilter,
+    yearFilter,
+    ratingFilter,
   };
 }
 
@@ -120,6 +130,16 @@ export function buildUrlSearch(state: UrlState): string {
 
   if (state.currentPage > 1) {
     params.set('page', String(Math.min(MAX_PAGE, Math.floor(state.currentPage))));
+  }
+
+  if (state.sortFilter && state.sortFilter !== 'updated-desc' && state.sortFilter !== 'default') {
+    params.set('sort', state.sortFilter);
+  }
+  if (state.yearFilter && state.yearFilter !== 'all') {
+    params.set('year', state.yearFilter);
+  }
+  if (state.ratingFilter && state.ratingFilter !== 'all') {
+    params.set('rating', state.ratingFilter);
   }
 
   return params.toString();

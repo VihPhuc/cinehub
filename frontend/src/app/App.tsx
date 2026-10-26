@@ -24,8 +24,10 @@ import { Navbar } from '@/features/navigation/Navbar';
 import { HeroBanner } from '@/features/home/HeroBanner';
 import { MovieRow } from '@/features/catalog/MovieRow';
 import { MovieGrid } from '@/features/catalog/MovieGrid';
+import type { SortKey } from '@/features/catalog/MovieGrid';
 import { MovieDetailModal } from '@/features/detail/MovieDetailModal';
 import { LibraryView } from '@/features/library/LibraryView';
+import { MovieRouletteModal } from '@/features/home/MovieRouletteModal';
 
 // Keep hls.js out of the initial bundle: it is only needed once a movie plays.
 const VideoPlayer = lazy(() =>
@@ -56,6 +58,10 @@ export function App() {
   const [currentPage, setCurrentPage] = useState(urlState.currentPage);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [showRouletteModal, setShowRouletteModal] = useState(false);
+  const [gridSort, setGridSort] = useState<SortKey>((urlState.sortFilter as SortKey) || 'updated-desc');
+  const [gridYear, setGridYear] = useState<string>(urlState.yearFilter || 'all');
+  const [gridRating, setGridRating] = useState<string>(urlState.ratingFilter || 'all');
 
   const [newUpdated, setNewUpdated] = useState<MovieItem[]>([]);
   const [singleMovies, setSingleMovies] = useState<MovieItem[]>([]);
@@ -135,26 +141,6 @@ export function App() {
     }
   };
 
-  const handleRandomMovie = () => {
-    const pool = [
-      ...latestMovies,
-      ...singleMovies,
-      ...seriesMovies,
-      ...animeMovies,
-      ...tvShows,
-      ...koreanMovies,
-      ...actionMovies,
-    ];
-    if (pool.length > 0) {
-      const randomIdx = Math.floor(Math.random() * pool.length);
-      const picked = pool[randomIdx];
-      setSelectedSlug(picked.slug);
-      showToast(`🎲 Đã chọn ngẫu nhiên: "${picked.name}"`, 'success');
-    } else {
-      showToast('Đang tải danh sách phim, vui lòng thử lại sau...', 'info');
-    }
-  };
-
   useEffect(() => {
     let ticking = false;
     const handleScroll = () => {
@@ -225,6 +211,9 @@ export function App() {
         suppressUrlSyncRef.current = false;
         setWatchingMovie(null);
       }
+      setGridSort((next.sortFilter as SortKey) || 'updated-desc');
+      setGridYear(next.yearFilter || 'all');
+      setGridRating(next.ratingFilter || 'all');
     };
 
     window.addEventListener('popstate', onPopState);
@@ -251,6 +240,9 @@ export function App() {
       selectedSlug,
       watchSlug: watchingMovie?.slug ?? null,
       watchEpIdx,
+      sortFilter: gridSort,
+      yearFilter: gridYear,
+      ratingFilter: gridRating,
     });
     const currentSearch = window.location.search.replace(/^\?/, '');
     // Treat semantically equivalent URLs as equal too (e.g. ep=0 vs omitted ep,
@@ -263,7 +255,19 @@ export function App() {
       ? `${window.location.pathname}?${newSearch}`
       : window.location.pathname;
     window.history.pushState(null, '', newUrl);
-  }, [watchingMovie, watchEpIdx, selectedSlug, activeTab, genreFilter, countryFilter, searchQuery, currentPage]);
+  }, [
+    watchingMovie,
+    watchEpIdx,
+    selectedSlug,
+    activeTab,
+    genreFilter,
+    countryFilter,
+    searchQuery,
+    currentPage,
+    gridSort,
+    gridYear,
+    gridRating,
+  ]);
 
   const refreshStorage = () => {
     setFavorites(getFavorites());
@@ -497,6 +501,26 @@ export function App() {
       topRatedMovies: selectTopRatedMovies(latest, 10, 20),
     };
   }, [newUpdated]);
+
+  const roulettePool = useMemo(() => {
+    return [
+      ...latestMovies,
+      ...singleMovies,
+      ...seriesMovies,
+      ...animeMovies,
+      ...tvShows,
+      ...koreanMovies,
+      ...actionMovies,
+    ];
+  }, [latestMovies, singleMovies, seriesMovies, animeMovies, tvShows, koreanMovies, actionMovies]);
+
+  const handleRandomMovie = () => {
+    if (roulettePool.length > 0) {
+      setShowRouletteModal(true);
+    } else {
+      showToast('Đang tải danh sách phim, vui lòng thử lại sau...', 'info');
+    }
+  };
 
   if (watchingMovie) {
     return (
@@ -910,6 +934,14 @@ export function App() {
             onSelectMovie={(m) => setSelectedSlug(m.slug)}
             favorites={favSlugs}
             onToggleFav={handleToggleFav}
+            initialSort={gridSort}
+            initialYear={gridYear}
+            initialRating={gridRating}
+            onFacetChange={({ sort, year, rating }) => {
+              if (sort) setGridSort(sort);
+              if (year) setGridYear(year);
+              if (rating) setGridRating(rating);
+            }}
           />
         )}
       </main>
@@ -980,8 +1012,34 @@ export function App() {
           isFav={favSlugs.includes(selectedSlug)}
           onToggleFav={handleToggleFav}
           onSelectSlug={(newSlug) => setSelectedSlug(newSlug)}
+          onSearchPerson={(personName) => {
+            setSelectedSlug(null);
+            setSearchQuery(personName);
+            setActiveTab('search');
+            setCurrentPage(1);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
         />
       )}
+
+      {/* Smart Movie Roulette Modal */}
+      <MovieRouletteModal
+        isOpen={showRouletteModal}
+        onClose={() => setShowRouletteModal(false)}
+        movies={roulettePool}
+        onSelectMovie={(slug) => {
+          setShowRouletteModal(false);
+          setSelectedSlug(slug);
+        }}
+        onWatchMovie={(slug) => {
+          setShowRouletteModal(false);
+          getMovieDetail(slug)
+            .then((m) => {
+              if (m) handleStartWatch(m);
+            })
+            .catch(() => {});
+        }}
+      />
 
       {/* Global Toast Notification */}
       {toast && (

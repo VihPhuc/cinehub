@@ -78,13 +78,23 @@ Cập nhật: 2026-10-24 (sau refactor frontend/backend và hoàn thành Backend
 - **Phân trang (A3):** Form nhảy trang dùng `noValidate` + validation tường minh; trang không hợp lệ hiển thị lỗi `role="alert"`, `aria-invalid`/`aria-describedby`, không còn im lặng; nhập trang hợp lệ cập nhật URL và reset ô nhập.
 - **Prefetch & Scroll Optimization (A5):** Debounce 180ms cho prefetch detail khi hover thẻ phim tránh spam CDN; throttle scroll listener bằng `requestAnimationFrame`; memoize `favSlugs`, `MovieCard`, và `MovieRow`.
 - **Import/Export Validation (B3):** Hàm `validateAndSanitizeBackup` kiểm tra chặt chẽ schema dữ liệu JSON và sanitize URL hình ảnh.
+- **Phương án 2 — Tủ Phim Thông Minh & Cá Nhân Hóa (Smart Library & Personalization):**
+  - *Viewing Insights & Thống kê cá nhân:* Thanh Dashboard tổng quan thời gian đã xem (giờ/phút), số tập hoàn thành, số phim đã lưu và số bộ sưu tập cá nhân.
+  - *Bộ sưu tập cá nhân (Custom Collections / Playlists):* Cho phép tạo mới, xóa, thêm/bớt phim vào bộ sưu tập cá nhân từ cả trang Tủ Phim và Chi tiết phim (`MovieDetailModal`). Xem danh sách phim theo từng bộ sưu tập riêng biệt.
+  - *Lọc trạng thái lịch sử xem:* Phân loại nhanh "Tất cả", "Đang xem dở" (<85%), "Đã xong" (>=85%) với huy hiệu trạng thái trực quan.
+  - *Sắp xếp danh sách yêu thích:* Sắp xếp theo ngày lưu (mới nhất/cũ nhất), tên phim (A-Z), năm phát hành (mới nhất).
+  - *Hộp thoại xem trước Backup (Backup Preview):* Phân tích tệp JSON trước khi nhập, cho phép người dùng lựa chọn "Hợp Nhất (Khuyên dùng)" an toàn không mất dữ liệu hiện có hoặc "Ghi Đè Tất Cả".
+- **Phương án 3 — Khám Phá & Bộ Lọc Đa Chiều Thông Minh (Discovery & Smart Multi-Facet Search):**
+  - *Tra cứu Diễn viên / Đạo diễn tương tác (Interactive Cast & Crew):* Thẻ badge đạo diễn và diễn viên trong `MovieDetailModal` trở thành nút bấm kèm biểu tượng kính lúp, lập tức chuyển sang trang tìm kiếm nhân sự tương ứng.
+  - *Đồng bộ Bộ lọc Đa Tiêu Chí lên URL (URL State Sync):* Các tiêu chí sắp xếp (`sort`), năm phát hành (`year`), đánh giá tối thiểu (`rating`) được đồng bộ 2 chiều vào query parameters trên URL và hỗ trợ nút "Chia sẻ bộ lọc" sao chép liên kết trực tiếp.
+  - *Vòng quay điện ảnh ngẫu nhiên (Smart Movie Roulette Modal):* Modal chọn phim ngẫu nhiên phong cách xúc xắc/roulette với hiệu ứng chuyển động slot machine đẹp mắt, hỗ trợ lọc theo thể loại và chọn nhanh xem phim hoặc mở chi tiết.
 
 ## Kiểm chứng
 
 Chạy tại `D:\Phim`:
 
 ```text
-npm run test:web        -> 8 test files, 67 tests passed
+npm run test:web        -> 8 test files, 76 tests passed
 npm run test:api        -> 34 unit + 36 e2e passed (tổng 70 tests)
 npm run lint            -> clean (frontend + backend)
 npm run build:web       -> pass (tsc -b + vite build)

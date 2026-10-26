@@ -1,7 +1,10 @@
-import type { FavoriteItem, HistoryItem, MovieDetail, MovieItem } from './types';
+import type { CustomCollection, FavoriteItem, HistoryItem, MovieDetail, MovieItem } from './types';
 import {
+  MAX_COLLECTIONS,
   MAX_FAVORITES,
   MAX_HISTORY,
+  normalizeCollection,
+  normalizeCollections,
   normalizeFavorite,
   normalizeFavorites,
   normalizeHistoryItem,
@@ -11,6 +14,7 @@ import {
 const FAVORITES_KEY = 'cineflix_favorites';
 const HISTORY_KEY = 'cineflix_history';
 const WATCHED_EPISODES_KEY = 'cineflix_watched_episodes';
+const COLLECTIONS_KEY = 'cineflix_collections';
 export const STORAGE_CHANGE_EVENT = 'cinehub:storage_change';
 
 export interface WatchedEpisodeInfo {
@@ -23,6 +27,7 @@ export interface WatchedEpisodeInfo {
 let memoryFavorites: FavoriteItem[] | null = null;
 let memoryHistory: HistoryItem[] | null = null;
 let memoryWatchedEpisodes: Record<string, Record<string, WatchedEpisodeInfo>> | null = null;
+let memoryCollections: CustomCollection[] | null = null;
 
 function notifyChange(key: string) {
   if (typeof window !== 'undefined') {
@@ -41,6 +46,9 @@ if (typeof window !== 'undefined') {
     } else if (e.key === WATCHED_EPISODES_KEY) {
       memoryWatchedEpisodes = null;
       notifyChange(WATCHED_EPISODES_KEY);
+    } else if (e.key === COLLECTIONS_KEY) {
+      memoryCollections = null;
+      notifyChange(COLLECTIONS_KEY);
     }
   });
 }
@@ -239,10 +247,89 @@ export function markEpisodeWatched(
   }
 }
 
+export function getCollections(): CustomCollection[] {
+  if (memoryCollections !== null) return memoryCollections;
+  try {
+    const raw = localStorage.getItem(COLLECTIONS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    memoryCollections = normalizeCollections(parsed, MAX_COLLECTIONS);
+    return memoryCollections;
+  } catch {
+    memoryCollections = [];
+    return [];
+  }
+}
+
+export function createCollection(name: string, description?: string): CustomCollection | null {
+  const trimmed = name?.trim();
+  if (!trimmed) return null;
+  const list = [...getCollections()];
+  if (list.length >= MAX_COLLECTIONS) return null;
+
+  const id = `col_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const item: CustomCollection = {
+    id,
+    name: trimmed,
+    description: description?.trim() || undefined,
+    createdAt: Date.now(),
+    slugs: [],
+  };
+  list.unshift(item);
+  memoryCollections = list;
+  safeSetItem(COLLECTIONS_KEY, JSON.stringify(list));
+  notifyChange(COLLECTIONS_KEY);
+  return item;
+}
+
+export function deleteCollection(id: string): boolean {
+  if (!id) return false;
+  const list = getCollections().filter((c) => c.id !== id);
+  memoryCollections = list;
+  safeSetItem(COLLECTIONS_KEY, JSON.stringify(list));
+  notifyChange(COLLECTIONS_KEY);
+  return true;
+}
+
+export function toggleMovieInCollection(collectionId: string, slug: string): boolean {
+  if (!collectionId || !slug) return false;
+  const list = getCollections().map((c) => {
+    if (c.id !== collectionId) return c;
+    const slugs = [...c.slugs];
+    const idx = slugs.indexOf(slug);
+    if (idx >= 0) {
+      slugs.splice(idx, 1);
+    } else {
+      if (slugs.length < MAX_COLLECTIONS) {
+        slugs.unshift(slug);
+      }
+    }
+    return { ...c, slugs };
+  });
+  memoryCollections = list;
+  safeSetItem(COLLECTIONS_KEY, JSON.stringify(list));
+  notifyChange(COLLECTIONS_KEY);
+  const target = list.find((c) => c.id === collectionId);
+  return target ? target.slugs.includes(slug) : false;
+}
+
+export function isMovieInCollection(collectionId: string, slug: string): boolean {
+  if (!collectionId || !slug) return false;
+  const col = getCollections().find((c) => c.id === collectionId);
+  return Boolean(col?.slugs.includes(slug));
+}
+
+export function getMovieCollections(slug: string): string[] {
+  if (!slug) return [];
+  return getCollections()
+    .filter((c) => c.slugs.includes(slug))
+    .map((c) => c.id);
+}
+
 export function exportUserData(): string {
   const data = {
     favorites: getFavorites(),
     history: getHistory(),
+    collections: getCollections(),
     watchedEpisodes: memoryWatchedEpisodes || (() => {
       try {
         const raw = localStorage.getItem(WATCHED_EPISODES_KEY);
@@ -252,25 +339,28 @@ export function exportUserData(): string {
       }
     })(),
     exportedAt: new Date().toISOString(),
-    version: '1.2',
+    version: '1.3',
   };
   return JSON.stringify(data, null, 2);
 }
 
 /**
  * Validate and sanitize user backup payload before committing to storage.
- * Ensures favorites and history items match strict schema rules and safe URLs.
+ * Ensures favorites, history, and collections match strict schema rules and safe URLs.
  */
 export function validateAndSanitizeBackup(parsed: Record<string, unknown>): {
   favorites: FavoriteItem[] | null;
   history: HistoryItem[] | null;
+  collections: CustomCollection[] | null;
 } | null {
   const hasFavorites = Array.isArray(parsed.favorites);
   const hasHistory = Array.isArray(parsed.history);
-  if (!hasFavorites && !hasHistory) return null;
+  const hasCollections = Array.isArray(parsed.collections);
+  if (!hasFavorites && !hasHistory && !hasCollections) return null;
 
   let nextFavorites: FavoriteItem[] | null = null;
   let nextHistory: HistoryItem[] | null = null;
+  let nextCollections: CustomCollection[] | null = null;
 
   if (hasFavorites) {
     const raw = parsed.favorites as unknown[];
@@ -284,12 +374,18 @@ export function validateAndSanitizeBackup(parsed: Record<string, unknown>): {
     nextHistory = normalizeHistoryList(raw, MAX_HISTORY);
   }
 
-  return { favorites: nextFavorites, history: nextHistory };
+  if (hasCollections) {
+    const raw = parsed.collections as unknown[];
+    if (raw.some((item) => normalizeCollection(item) === null)) return null;
+    nextCollections = normalizeCollections(raw, MAX_COLLECTIONS);
+  }
+
+  return { favorites: nextFavorites, history: nextHistory, collections: nextCollections };
 }
 
 /**
- * Validate and import user backup data (favorites + history).
- * Rejects corrupt data, truncates to maximum capacity, and sanitizes untrusted links.
+ * Validate and import user backup data (favorites + history + collections).
+ * Replaces current storage with validated backup.
  */
 export function importUserData(jsonStr: string): boolean {
   try {
@@ -307,6 +403,70 @@ export function importUserData(jsonStr: string): boolean {
       memoryHistory = validated.history;
       safeSetItem(HISTORY_KEY, JSON.stringify(validated.history));
       notifyChange(HISTORY_KEY);
+    }
+
+    if (validated.collections) {
+      memoryCollections = validated.collections;
+      safeSetItem(COLLECTIONS_KEY, JSON.stringify(validated.collections));
+      notifyChange(COLLECTIONS_KEY);
+    }
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Merge user backup data with current storage without deleting existing items.
+ */
+export function mergeUserData(jsonStr: string): boolean {
+  try {
+    const parsed = JSON.parse(jsonStr) as Record<string, unknown>;
+    const validated = validateAndSanitizeBackup(parsed);
+    if (!validated) return false;
+
+    if (validated.favorites && validated.favorites.length > 0) {
+      const current = getFavorites();
+      const currentSlugs = new Set(current.map((f) => f.slug));
+      const newItems = validated.favorites.filter((f) => !currentSlugs.has(f.slug));
+      const merged = [...newItems, ...current].slice(0, MAX_FAVORITES);
+      memoryFavorites = merged;
+      safeSetItem(FAVORITES_KEY, JSON.stringify(merged));
+      notifyChange(FAVORITES_KEY);
+    }
+
+    if (validated.history && validated.history.length > 0) {
+      const current = getHistory();
+      const currentKeys = new Set(current.map((h) => `${h.slug}\u0000${h.episodeSlug}`));
+      const newItems = validated.history.filter(
+        (h) => !currentKeys.has(`${h.slug}\u0000${h.episodeSlug}`)
+      );
+      const merged = [...newItems, ...current].slice(0, MAX_HISTORY);
+      memoryHistory = merged;
+      safeSetItem(HISTORY_KEY, JSON.stringify(merged));
+      notifyChange(HISTORY_KEY);
+    }
+
+    if (validated.collections && validated.collections.length > 0) {
+      const current = getCollections();
+      const currentMap = new Map(current.map((c) => [c.id, { ...c }]));
+      for (const col of validated.collections) {
+        if (currentMap.has(col.id)) {
+          const existing = currentMap.get(col.id)!;
+          const mergedSlugs = Array.from(new Set([...col.slugs, ...existing.slugs])).slice(
+            0,
+            MAX_COLLECTIONS
+          );
+          currentMap.set(col.id, { ...existing, slugs: mergedSlugs });
+        } else {
+          currentMap.set(col.id, col);
+        }
+      }
+      const merged = Array.from(currentMap.values()).slice(0, MAX_COLLECTIONS);
+      memoryCollections = merged;
+      safeSetItem(COLLECTIONS_KEY, JSON.stringify(merged));
+      notifyChange(COLLECTIONS_KEY);
     }
 
     return true;

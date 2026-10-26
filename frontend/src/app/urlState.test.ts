@@ -101,4 +101,20 @@ describe('buildUrlSearch', () => {
     expect(search.get('tab')).toBeNull();
     expect(search.get('page')).toBeNull();
   });
+
+  it('serializes and parses multi-facet filter parameters (sort, year, rating)', () => {
+    const url = '?tab=phim-bo&year=2024&rating=7&sort=rating';
+    const parsedState = parseUrlState(url);
+    expect(parsedState.activeTab).toBe('phim-bo');
+    expect(parsedState.yearFilter).toBe('2024');
+    expect(parsedState.ratingFilter).toBe('7');
+    expect(parsedState.sortFilter).toBe('rating');
+
+    const serialized = buildUrlSearch(parsedState);
+    const searchParams = new URLSearchParams(serialized);
+    expect(searchParams.get('tab')).toBe('phim-bo');
+    expect(searchParams.get('year')).toBe('2024');
+    expect(searchParams.get('rating')).toBe('7');
+    expect(searchParams.get('sort')).toBe('rating');
+  });
 });

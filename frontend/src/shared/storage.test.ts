@@ -124,3 +124,72 @@ describe('Watched Episodes tracking', () => {
     expect(getWatchedEpisodes('naruto')['tap-2'].completed).toBe(true);
   });
 });
+
+describe('Custom Collections Management', () => {
+  it('tạo, thêm/bớt phim và xóa bộ sưu tập chính xác', async () => {
+    const {
+      getCollections,
+      createCollection,
+      deleteCollection,
+      toggleMovieInCollection,
+      isMovieInCollection,
+      getMovieCollections,
+    } = await import('./storage');
+
+    expect(getCollections()).toHaveLength(0);
+
+    const col = createCollection('Phim Hay', 'Các phim tâm đắc');
+    expect(col).not.toBeNull();
+    expect(col?.name).toBe('Phim Hay');
+    expect(col?.description).toBe('Các phim tâm đắc');
+    expect(getCollections()).toHaveLength(1);
+
+    const added = toggleMovieInCollection(col!.id, 'avatar-2');
+    expect(added).toBe(true);
+    expect(isMovieInCollection(col!.id, 'avatar-2')).toBe(true);
+    expect(getMovieCollections('avatar-2')).toContain(col!.id);
+
+    // Toggle again removes it
+    const removed = toggleMovieInCollection(col!.id, 'avatar-2');
+    expect(removed).toBe(false);
+    expect(isMovieInCollection(col!.id, 'avatar-2')).toBe(false);
+
+    // Delete collection
+    const deleted = deleteCollection(col!.id);
+    expect(deleted).toBe(true);
+    expect(getCollections()).toHaveLength(0);
+  });
+});
+
+describe('mergeUserData', () => {
+  it('hợp nhất favorites, history và collections mà không ghi đè dữ liệu cũ', async () => {
+    localStorage.setItem(
+      'cineflix_favorites',
+      JSON.stringify([{ slug: 'old-fav', name: 'Old Favorite', savedAt: 100 }])
+    );
+    const { getFavorites, getCollections, mergeUserData } = await import('./storage');
+
+    const backupPayload = JSON.stringify({
+      favorites: [{ slug: 'new-fav', name: 'New Favorite', savedAt: 200 }],
+      collections: [
+        {
+          id: 'col-1',
+          name: 'Bộ Phim Mới',
+          createdAt: 300,
+          slugs: ['dune-2'],
+        },
+      ],
+    });
+
+    const ok = mergeUserData(backupPayload);
+    expect(ok).toBe(true);
+
+    const favSlugs = getFavorites().map((f) => f.slug);
+    expect(favSlugs).toContain('old-fav');
+    expect(favSlugs).toContain('new-fav');
+
+    const cols = getCollections();
+    expect(cols).toHaveLength(1);
+    expect(cols[0].name).toBe('Bộ Phim Mới');
+  });
+});
