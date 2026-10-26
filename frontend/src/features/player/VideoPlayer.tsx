@@ -62,6 +62,12 @@ export const VideoPlayer: React.FC<Props> = ({
   const [resumeNotice, setResumeNotice] = useState<string | null>(null);
   const [speed, setSpeed] = useState<number>(1);
   const [epFilter, setEpFilter] = useState<string>('');
+  const [selectedEpChunk, setSelectedEpChunk] = useState<number | null>(null);
+  const [lastEpIdx, setLastEpIdx] = useState(epIdx);
+  if (epIdx !== lastEpIdx) {
+    setLastEpIdx(epIdx);
+    setSelectedEpChunk(null);
+  }
   const [theaterMode, setTheaterMode] = useState<boolean>(() => {
     try {
       return localStorage.getItem('cinehub_theater_mode') === 'true';
@@ -105,6 +111,22 @@ export const VideoPlayer: React.FC<Props> = ({
   const server = movie.episodes?.[serverIdx] || movie.episodes?.[0];
   const ep = server?.server_data?.[epIdx] || server?.server_data?.[0];
   const hasNext = Boolean(server?.server_data?.[epIdx + 1]);
+
+  const totalEps = server?.server_data?.length || 0;
+  const CHUNK_SIZE = 25;
+  const epChunks = useMemo(() => {
+    if (totalEps <= CHUNK_SIZE) return [];
+    const count = Math.ceil(totalEps / CHUNK_SIZE);
+    return Array.from({ length: count }, (_, i) => ({
+      index: i,
+      start: i * CHUNK_SIZE,
+      end: Math.min((i + 1) * CHUNK_SIZE, totalEps),
+      label: `Tập ${i * CHUNK_SIZE + 1} - ${Math.min((i + 1) * CHUNK_SIZE, totalEps)}`,
+    }));
+  }, [totalEps]);
+
+  const epChunkIdx = selectedEpChunk ?? Math.floor(epIdx / CHUNK_SIZE);
+  const setEpChunkIdx = (idx: number) => setSelectedEpChunk(idx);
 
   // Keep the player in sync with browser back/forward (App updates initialEpIdx
   // from the URL) without remounting or interrupting the current stream.
@@ -1068,15 +1090,40 @@ export const VideoPlayer: React.FC<Props> = ({
                   )}
                 </div>
 
+                {/* Chunk Selector for long series */}
+                {epChunks.length > 0 && !epFilter.trim() && (
+                  <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
+                    {epChunks.map((chunk) => (
+                      <button
+                        key={chunk.index}
+                        type="button"
+                        onClick={() => setEpChunkIdx(chunk.index)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all shrink-0 border ${
+                          epChunkIdx === chunk.index
+                            ? 'bg-gradient-to-r from-red-600 to-rose-600 border-red-500 text-white shadow-sm shadow-red-600/30 glow-red-sm'
+                            : 'glass-pill border-white/10 text-zinc-300 hover:text-white hover:bg-white/10'
+                        }`}
+                      >
+                        {chunk.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
                 <div className="grid grid-cols-3 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2 max-h-56 overflow-y-auto p-1">
                   {server.server_data
                     .map((e, idx) => ({ e, idx }))
-                    .filter(({ e }) =>
-                      !epFilter.trim()
-                        ? true
-                        : e.name.toLowerCase().includes(epFilter.toLowerCase().trim()) ||
-                          e.slug.toLowerCase().includes(epFilter.toLowerCase().trim())
-                    )
+                    .filter(({ e, idx }) => {
+                      if (epFilter.trim()) {
+                        const q = epFilter.toLowerCase().trim();
+                        return e.name.toLowerCase().includes(q) || e.slug.toLowerCase().includes(q);
+                      }
+                      if (epChunks.length > 0) {
+                        const chunk = epChunks[epChunkIdx] || epChunks[0];
+                        return idx >= chunk.start && idx < chunk.end;
+                      }
+                      return true;
+                    })
                     .map(({ e, idx }) => {
                       const isCurrent = epIdx === idx;
                       const watched = watchedMap[e.slug];

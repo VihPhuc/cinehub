@@ -80,10 +80,29 @@ export const MovieDetailModal: React.FC<Props> = ({
 
   const handleShare = () => {
     const url = `${window.location.origin}${window.location.pathname}?info=${movie?.slug || activeSlug}`;
-    navigator.clipboard.writeText(url).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      navigator
+        .share({
+          title: movie ? formatMovieTitle(movie.name) : 'CineHub',
+          text: `Xem phim ${movie ? formatMovieTitle(movie.name) : ''} trên CineHub`,
+          url,
+        })
+        .then(() => {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2000);
+        })
+        .catch(() => {
+          navigator.clipboard.writeText(url).then(() => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+          });
+        });
+    } else {
+      navigator.clipboard.writeText(url).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      });
+    }
   };
 
   const previousActiveElementRef = useRef<HTMLElement | null>(null);

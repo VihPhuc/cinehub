@@ -28,6 +28,7 @@ import type { SortKey } from '@/features/catalog/MovieGrid';
 import { MovieDetailModal } from '@/features/detail/MovieDetailModal';
 import { LibraryView } from '@/features/library/LibraryView';
 import { MovieRouletteModal } from '@/features/home/MovieRouletteModal';
+import { MobileBottomNav } from '@/features/navigation/MobileBottomNav';
 
 // Keep hls.js out of the initial bundle: it is only needed once a movie plays.
 const VideoPlayer = lazy(() =>
@@ -599,7 +600,7 @@ export function App() {
         }}
       />
 
-      <main id="main-content" className="flex-1 pb-20 relative z-10">
+      <main id="main-content" className="flex-1 pb-24 md:pb-16 relative z-10">
         {activeTab === 'home' && (
           <>
             <HeroBanner
@@ -619,7 +620,7 @@ export function App() {
                   </span>
                   {[
                     { id: 'phim-le', label: '🎬 Phim Lẻ' },
-                    { id: 'phim-bo', label: '📺 Phim Bộ Mới Cập Nhật' },
+                    { id: 'phim-bo', label: '📺 Phim Bộ' },
                     { id: 'hoat-hinh', label: '⚡ Anime' },
                     { id: 'tv-shows', label: '🎪 TV Shows' },
                     { id: 'library', label: '⭐ Tủ Phim' },
@@ -635,6 +636,13 @@ export function App() {
                       {chip.label}
                     </button>
                   ))}
+                  <button
+                    onClick={() => setShowRouletteModal(true)}
+                    className="shrink-0 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 text-amber-300 hover:text-amber-200 text-xs font-semibold transition-all cursor-pointer hover:border-amber-400/50 flex items-center gap-1.5"
+                    title="Vòng quay phim ngẫu nhiên thông minh"
+                  >
+                    <span>🎲</span> Vòng Quay Phim
+                  </button>
                 </div>
 
                 {lastHomeUpdatedAt && (
@@ -1046,7 +1054,7 @@ export function App() {
         <div
           role="status"
           aria-live="polite"
-          className="fixed bottom-7 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2.5 px-4 py-2.5 rounded-2xl glass-dropdown border border-white/20 shadow-2xl animate-in fade-in slide-in-from-bottom-3 duration-200 pointer-events-none"
+          className="fixed bottom-20 sm:bottom-7 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2.5 px-4 py-2.5 rounded-2xl glass-dropdown border border-white/20 shadow-2xl animate-in fade-in slide-in-from-bottom-3 duration-200 pointer-events-none"
         >
           <div
             className={`w-2 h-2 rounded-full shrink-0 ${
@@ -1065,12 +1073,24 @@ export function App() {
       {showScrollTop && (
         <button
           onClick={scrollToTop}
-          className="fixed bottom-6 right-6 p-3.5 rounded-2xl bg-gradient-to-tr from-red-600 to-rose-500 hover:from-red-500 hover:to-rose-400 text-white shadow-2xl glow-red cursor-pointer transition-all z-40 hover:scale-110 active:scale-95 border border-white/20"
+          className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 p-3.5 rounded-2xl bg-gradient-to-tr from-red-600 to-rose-500 hover:from-red-500 hover:to-rose-400 text-white shadow-2xl glow-red cursor-pointer transition-all z-40 hover:scale-110 active:scale-95 border border-white/20"
           title="Cuộn lên đầu trang"
         >
           <ArrowUp className="w-5 h-5" />
         </button>
       )}
+
+      {/* Mobile Bottom Navigation Bar */}
+      <MobileBottomNav
+        activeTab={activeTab}
+        onSelectTab={(tab) => {
+          setActiveTab(tab);
+          setCurrentPage(1);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        onOpenRoulette={() => setShowRouletteModal(true)}
+        favoriteCount={favSlugs.length}
+      />
     </div>
   );
 }

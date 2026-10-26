@@ -10,6 +10,7 @@ interface Props {
   isFav?: boolean;
   onToggleFav?: () => void;
   showUpdatedAt?: boolean;
+  rank?: number;
 }
 
 export const MovieCard: React.FC<Props> = React.memo(({
@@ -19,6 +20,7 @@ export const MovieCard: React.FC<Props> = React.memo(({
   isFav,
   onToggleFav,
   showUpdatedAt,
+  rank,
 }) => {
   const [imgError, setImgError] = React.useState(false);
   const prefetchTimerRef = React.useRef<number | null>(null);
@@ -76,13 +78,27 @@ export const MovieCard: React.FC<Props> = React.memo(({
           </div>
         )}
 
-        {/* Top Badges (Quality & Lang) */}
+        {/* Top Badges (Rank, Quality & Lang) */}
         <div className="absolute top-2.5 left-2.5 flex flex-wrap gap-1.5 z-10 pointer-events-none">
-          {movie.quality && (
+          {rank ? (
+            <span
+              className={`px-2 py-0.5 rounded-md text-[11px] font-black uppercase tracking-wider shadow-lg flex items-center gap-1 ${
+                rank === 1
+                  ? 'bg-gradient-to-r from-amber-400 via-yellow-400 to-amber-500 text-black shadow-amber-500/40 ring-1 ring-amber-300'
+                  : rank === 2
+                  ? 'bg-gradient-to-r from-slate-100 via-zinc-200 to-slate-300 text-zinc-950 shadow-slate-300/30 ring-1 ring-white/60'
+                  : rank === 3
+                  ? 'bg-gradient-to-r from-amber-600 via-orange-500 to-amber-700 text-white shadow-orange-600/30 ring-1 ring-amber-400/50'
+                  : 'bg-black/85 backdrop-blur-md text-zinc-200 border border-white/20'
+              }`}
+            >
+              <span>TOP {rank}</span>
+            </span>
+          ) : movie.quality ? (
             <span className="px-2 py-0.5 rounded-md text-[11px] font-black uppercase tracking-wider bg-gradient-to-r from-red-600 to-rose-600 text-white shadow-md shadow-red-600/30">
               {movie.quality}
             </span>
-          )}
+          ) : null}
           {movie.lang && (
             <span className="px-1.5 py-0.5 rounded-md text-[11px] font-semibold bg-black/60 backdrop-blur-md text-zinc-200 border border-white/10">
               {movie.lang}

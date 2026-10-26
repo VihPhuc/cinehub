@@ -170,7 +170,24 @@ Kiểm tra thủ công bằng Chrome headless + CDP trên `vite preview`:
     - `fetchWithCache` và các API getter hỗ trợ `options?: RequestOptions` với `bypassCache: true`, gửi request `cache: 'no-store'` và cập nhật bộ nhớ đệm khi có kết quả mới.
     - Service Worker (`sw.js`): nhận diện `request.cache === 'no-store'` để bỏ qua đọc cache và fetch network; nâng cấp `API_CACHE` lên `cinehub-api-v4` và `SHELL_CACHE` lên `cinehub-shell-v6`.
   - **Kiểm thử:**
-    - Toàn bộ **72/72 tests frontend** pass (thêm 5 test mới cho `sanitizeMovieItem`, `sortMoviesByUpdatedAtDesc`, `selectTopRatedMovies`, SW `no-store` cache bypass, và `getNewUpdatedMovies` bypassCache).
+    - Toàn bộ **76/76 tests frontend** pass (thêm 5 test mới cho `sanitizeMovieItem`, `sortMoviesByUpdatedAtDesc`, `selectTopRatedMovies`, SW `no-store` cache bypass, và `getNewUpdatedMovies` bypassCache).
     - `oxlint` 0 lỗi, TypeScript typecheck pass, Vite production build hoàn tất sạch sẽ.
+
+- **Tối ưu trải nghiệm UI/UX đa nền tảng (Desktop & Mobile) (`feat/frontend-ui-ux-optimization` - 2026-10-26):**
+  - **Thanh điều hướng Mobile Bottom Nav (`MobileBottomNav.tsx`):**
+    - Thiết kế thanh điều hướng cố định chân màn hình (`fixed bottom-0 inset-x-0 z-40 md:hidden`) với hiệu ứng kính mờ cao cấp (`backdrop-blur-2xl`), hỗ trợ vùng an toàn thiết bị (`env(safe-area-inset-bottom)`).
+    - 5 nút chạm nhanh ngón cái tiện lợi: Trang Chủ, Phim Lẻ, Vòng Quay May Mắn (nút hành động nổi bật), Phim Bộ, và Tủ Phim (kèm badge đếm số phim đã lưu).
+    - Đồng bộ tự động vị trí Scroll-to-Top và Toast thông báo tránh bị che khuất trên mobile.
+  - **Thiết kế Typography & Badge TOP 10 Hiện Đại (`MovieRow.tsx`, `MovieCard.tsx`):**
+    - Khắc phục số thứ tự đen mờ che poster: áp dụng typography gradient kim loại đa sắc (`#1 Gold`, `#2 Silver`, `#3 Bronze`, `#4-10 Frosted Chrome`) với viền nét `WebkitTextStroke` và drop shadow phát sáng.
+    - Bổ sung huy hiệu thứ hạng mini (`TOP #`) sang trọng ngay trên poster thẻ phim, dễ nhìn trên cả màn hình nhỏ và lớn.
+  - **Phân nhóm tập phim thông minh theo Tabs 25 tập (`VideoPlayer.tsx`):**
+    - Giải quyết cuộn dọc nặng nề trên mobile/desktop đối với các phim bộ dài tập (Anime, C-Drama 30 - 100+ tập).
+    - Tự động chia tabs dạng viên thuốc (`Tập 1 - 25`, `Tập 26 - 50`...), tự động chọn tab tương ứng với tập đang phát, không gây giật lag hay render thừa.
+  - **Chia sẻ phim gốc trên điện thoại (`MovieDetailModal.tsx`):**
+    - Tích hợp Web Share API (`navigator.share`) cho phép chia sẻ nhanh trực tiếp qua Zalo, Messenger, Telegram hoặc SMS trên điện thoại di động; tự động fallback về sao chép liên kết vào clipboard trên máy tính.
+  - **Nút truy cập nhanh Vòng Quay Phim:**
+    - Bổ sung nút "🎲 Vòng Quay Phim" trực tiếp vào hàng Category Chips dưới Hero Banner trang chủ để người dùng bấm quay ngay khi phân vân không biết xem gì.
+
 
 

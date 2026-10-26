@@ -113,13 +113,29 @@ export const MovieRow: React.FC<Props> = React.memo(({
       >
         {displayMovies.map((movie, idx) =>
           isTop10 ? (
-            <div key={movie.slug} className="flex items-center shrink-0 pl-1">
+            <div key={movie.slug} className="flex items-center shrink-0 pl-1 group">
               <span
-                className="text-7xl sm:text-8xl lg:text-9xl font-black font-heading select-none -mr-4 sm:-mr-6 z-10 pointer-events-none drop-shadow-2xl"
+                className="text-6xl sm:text-7xl lg:text-8xl font-black font-heading select-none -mr-3 sm:-mr-4 z-10 pointer-events-none drop-shadow-2xl transition-transform duration-300 group-hover:scale-105"
                 style={{
-                  WebkitTextStroke: '2.5px rgba(255, 255, 255, 0.4)',
-                  WebkitTextFillColor: '#0c0e16',
-                  filter: 'drop-shadow(0 6px 16px rgba(225, 29, 72, 0.35))',
+                  background:
+                    idx === 0
+                      ? 'linear-gradient(180deg, #FEF08A 0%, #EAB308 50%, #92400E 100%)'
+                      : idx === 1
+                      ? 'linear-gradient(180deg, #FFFFFF 0%, #E2E8F0 50%, #64748B 100%)'
+                      : idx === 2
+                      ? 'linear-gradient(180deg, #FED7AA 0%, #F97316 50%, #9A3412 100%)'
+                      : 'linear-gradient(180deg, #FFFFFF 0%, #94A3B8 60%, #334155 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  WebkitTextStroke: '1.5px rgba(255, 255, 255, 0.5)',
+                  filter:
+                    idx === 0
+                      ? 'drop-shadow(0 4px 18px rgba(234, 179, 8, 0.45))'
+                      : idx === 1
+                      ? 'drop-shadow(0 4px 16px rgba(148, 163, 184, 0.4))'
+                      : idx === 2
+                      ? 'drop-shadow(0 4px 16px rgba(249, 115, 22, 0.4))'
+                      : 'drop-shadow(0 4px 12px rgba(0, 0, 0, 0.6))',
                 }}
               >
                 {idx + 1}
@@ -132,6 +148,7 @@ export const MovieRow: React.FC<Props> = React.memo(({
                   isFav={favorites.includes(movie.slug)}
                   onToggleFav={() => onToggleFav(movie)}
                   showUpdatedAt={showUpdatedAt}
+                  rank={idx + 1}
                 />
               </div>
             </div>
