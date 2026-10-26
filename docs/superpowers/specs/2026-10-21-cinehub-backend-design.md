@@ -210,13 +210,23 @@ GET /api/compat/v1/api/danh-sach/phim-le?page=1
 | Method | Path | Mô tả | Query |
 |---|---|---|---|
 | GET | `/api/v1/movies/new` | Phim mới cập nhật | `page` |
-| GET | `/api/v1/movies` | Catalog theo loại | `type`, `page` |
+| GET | `/api/v1/movies` | Catalog theo loại | `type`, `page`, `sort`, `order`, `year`, `category`, `country` |
 | GET | `/api/v1/movies/:slug` | Chi tiết + episodes | — |
-| GET | `/api/v1/genres/:slug/movies` | Theo thể loại | `page` |
-| GET | `/api/v1/countries/:slug/movies` | Theo quốc gia | `page` |
+| GET | `/api/v1/genres/:slug/movies` | Theo thể loại | `page`, `sort`, `order`, `year`, `category`, `country` |
+| GET | `/api/v1/countries/:slug/movies` | Theo quốc gia | `page`, `sort`, `order`, `year`, `category`, `country` |
 | GET | `/api/v1/search` | Tìm kiếm | `q`, `page` |
+| GET | `/api/v1/discover` | Sort/filter toàn catalog từ index | `page`, `sort`, `order`, `type`, `year`, `category`, `country`, `rating`, `language`, `chieurap`, `q` |
 
 `type` bắt buộc với `/api/v1/movies`: `phim-le | phim-bo | hoat-hinh | tv-shows`.
+`sort` chỉ có ở catalog/genre/country: `updated | year`, mặc định `updated`.
+`order`: `desc | asc`, mặc định `desc`. Giá trị khác trả `400`.
+`/api/v1/movies/new` không nhận `sort`, `order` hay filter.
+
+`/api/v1/discover` là bổ sung của phase catalog index: đọc snapshot JSON của 4
+loại catalog và trả sort/filter toàn catalog cho cả các field upstream bỏ qua
+(`rating`, `language`, `chieurap`, `name`). Endpoint này trả `503` khi snapshot
+chưa được build; các route cũ không đổi. Chi tiết thiết kế và vận hành xem
+[2026-10-26-cinehub-catalog-index-design.md](2026-10-26-cinehub-catalog-index-design.md).
 
 Thứ tự route: `/movies/new` phải được đăng ký **trước** `/movies/:slug` để Nest
 không hiểu `new` là slug. Các route tĩnh khác cũng đặt trước route param.
@@ -234,6 +244,7 @@ không hiểu `new` là slug. Các route tĩnh khác cũng đặt trước route
       "thumb_url": "https://...",
       "poster_url": "https://...",
       "year": 2026,
+      "updatedAt": "2026-10-24T15:56:02.000Z",
       "time": "120 phút",
       "episode_current": "Full",
       "quality": "HD",
@@ -258,6 +269,33 @@ không hiểu `new` là slug. Các route tĩnh khác cũng đặt trước route
 - `pagination.page` là page thực tế đã gửi upstream.
 - Không trả các field upstream không nằm trong DTO (`modified`, `imdb`,
   `last_episodes`, `seoOnPage`, ...) để contract ổn định.
+- `updatedAt` là dẫn xuất từ `modified.time`, chuẩn hóa ISO 8601 UTC. Field
+  optional: thiếu hoặc không parse được thì bỏ, không trả raw `modified`.
+- `updatedAt` là thời điểm cập nhật nội dung, khác `year` (năm phát hành).
+
+Filter catalog/genre/country (có thể kết hợp):
+
+- `year`: một năm trong khoảng 1888–2100. Range/comma trả `400` vì upstream chỉ
+  áp dụng đúng một năm.
+- `category`: slug thể loại, ví dụ `hanh-dong`.
+- `country`: slug quốc gia, ví dụ `viet-nam`.
+- Filter không áp dụng cho `/movies/new` và `/search`.
+
+Giới hạn upstream (khảo sát 2026-10):
+
+- `sort_field=modified.time|year` hoạt động với cả `asc`/`desc`.
+- `view`, `vote_average`, `vote_count`, `name`, `language` bị upstream bỏ qua.
+- Vì vậy backend không mở sort/filter toàn catalog cho các field đó; giá trị
+  `sort` không hỗ trợ trả `400` thay vì sort tạm trong 24 item/trang.
+
+Thứ tự danh sách:
+
+- `/api/v1/movies/new`: giữ thứ tự upstream, stable sort `updatedAt` giảm dần.
+- Catalog/genre/country: gửi upstream `sort_field` + `sort_type=<order>`, kèm
+  filter, rồi stable sort local theo cùng field và hướng.
+- Search: giữ relevance order của upstream, không sort lại.
+- Item thiếu timestamp/năm hợp lệ xếp cuối ở cả hai hướng; item bằng nhau giữ
+  thứ tự gốc.
 
 #### Detail response
 
@@ -273,6 +311,7 @@ không hiểu `new` là slug. Các route tĩnh khác cũng đặt trước route
     "thumb_url": "https://...",
     "poster_url": "https://...",
     "year": 2026,
+    "updatedAt": "2026-10-24T15:56:02.000Z",
     "time": "45 phút",
     "episode_current": "Tập 10",
     "episode_total": "24",

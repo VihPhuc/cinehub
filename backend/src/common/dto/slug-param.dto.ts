@@ -1,6 +1,8 @@
 import { Matches } from 'class-validator';
 
+export const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
 export class SlugParamDto {
-  @Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
+  @Matches(SLUG_PATTERN)
   slug!: string;
 }

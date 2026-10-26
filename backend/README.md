@@ -30,9 +30,14 @@ npm run start:dev
 npm run lint
 npm test
 npm run test:e2e
+npm run index:refresh
 ```
 
 All tests use a local upstream stub; they never call PhimAPI.
+
+`npm run index:refresh` crawls the four catalog types into
+`data/catalog-index.json`. It is the only way to build or refresh the catalog
+index; restart the API afterwards so it loads the new snapshot.
 
 ## Configuration
 
@@ -56,6 +61,8 @@ RATE_LIMIT_TTL_MS=60000
 RATE_LIMIT_LIMIT=120
 TRUST_PROXY=false
 SWAGGER_ENABLED=true
+CATALOG_INDEX_PATH=data/catalog-index.json
+CATALOG_INDEX_CONCURRENCY=8
 ```
 
 ## Cache
@@ -68,7 +75,33 @@ The compat and normalized surfaces share the same raw upstream cache key, so a
 compat request can warm the cache for `/api/v1`. Failed envelopes
 (`status:false`), errors, and malformed payloads are never cached.
 
+## Catalog index and discovery
+
+PhimAPI ignores `rating`, `language`, `chieurap`, and `name` as sort/filter
+fields. To make those facets work across the whole catalog, the backend keeps a
+JSON snapshot of the four catalog types (`phim-le`, `phim-bo`, `hoat-hinh`,
+`tv-shows`) in memory:
+
+```bash
+npm run index:refresh
+# then restart the API
+```
+
+- Snapshot: `backend/data/catalog-index.json` (gitignored), override with
+  `CATALOG_INDEX_PATH`.
+- Crawl concurrency: `CATALOG_INDEX_CONCURRENCY` (default 8, range 1–32).
+- `GET /api/v1/discover` serves full-catalog sort/filter/facets from the
+  snapshot; it is independent of the upstream cache.
+- Until the snapshot exists or if it is corrupt, `/api/v1/discover` returns
+  `503` and the app plus all older routes keep working.
+- Refreshes are atomic: a failed crawl leaves the previous snapshot untouched.
+- Existing `/api/v1` routes, `/movies/new`, and `/search` are unchanged.
+
+Cast/crew search is not included: it would require crawling roughly 30k detail
+pages.
+
 ## Scope
 
 Phase 1 is proxy/cache/normalized API only. No auth, DB, comments, admin, or
-HLS/iframe proxying.
+HLS/iframe proxying. The catalog index is a local JSON snapshot plus an
+in-memory query layer; it adds no database or new runtime dependency.

@@ -65,6 +65,14 @@ export class MovieSummaryDto {
   @ApiPropertyOptional()
   chieurap?: boolean;
 
+  @ApiPropertyOptional({
+    type: String,
+    format: 'date-time',
+    example: '2026-10-24T15:56:02.000Z',
+    description: 'Thời điểm cập nhật nội dung gần nhất, dạng ISO 8601 UTC',
+  })
+  updatedAt?: string;
+
   @ApiPropertyOptional({ type: () => MovieTmdbDto })
   tmdb?: MovieTmdbDto;
 

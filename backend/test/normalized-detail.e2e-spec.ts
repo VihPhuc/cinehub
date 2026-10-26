@@ -36,6 +36,7 @@ describe('Normalized detail API', () => {
       slug: 'phim-test',
       content: '<p>Nội dung phim</p>',
       type: 'movie',
+      updatedAt: '2026-10-24T15:56:02.000Z',
       episode_total: 'Full',
       view: 42,
       actor: ['Diễn viên A'],

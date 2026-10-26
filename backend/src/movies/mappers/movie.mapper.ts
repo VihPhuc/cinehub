@@ -33,6 +33,12 @@ function httpUrl(value: unknown): string | undefined {
   }
 }
 
+function isoDate(value: unknown): string | undefined {
+  if (typeof value !== 'string' || value.trim() === '') return undefined;
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : undefined;
+}
+
 function namedItems(value: unknown): MovieNamedDto[] | undefined {
   if (!Array.isArray(value)) return undefined;
   const items = value
@@ -93,6 +99,10 @@ export function mapMovieSummary(raw: UpstreamMovie): MovieSummaryDto {
   if (text(raw.quality)) result.quality = text(raw.quality);
   if (text(raw.lang)) result.lang = text(raw.lang);
   if (typeof raw.chieurap === 'boolean') result.chieurap = raw.chieurap;
+
+  const modifiedTime = typeof raw.modified === 'string' ? raw.modified : raw.modified?.time;
+  const updatedAt = isoDate(modifiedTime);
+  if (updatedAt) result.updatedAt = updatedAt;
 
   if (raw.tmdb && typeof raw.tmdb === 'object') {
     result.tmdb = {

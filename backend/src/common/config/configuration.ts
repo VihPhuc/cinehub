@@ -26,6 +26,10 @@ export default () => ({
     ttlMs: Number(process.env.RATE_LIMIT_TTL_MS ?? 60_000),
     limit: Number(process.env.RATE_LIMIT_LIMIT ?? 120),
   },
+  catalogIndex: {
+    path: process.env.CATALOG_INDEX_PATH ?? 'data/catalog-index.json',
+    concurrency: Number(process.env.CATALOG_INDEX_CONCURRENCY ?? 8),
+  },
   trustProxy: process.env.TRUST_PROXY === 'true',
   swagger: {
     enabled:
