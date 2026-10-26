@@ -633,10 +633,11 @@ export function App() {
                   ))}
                   <button
                     onClick={() => setShowRouletteModal(true)}
-                    className="shrink-0 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 text-amber-300 hover:text-amber-200 text-xs font-semibold transition-all cursor-pointer hover:border-amber-400/50 flex items-center gap-1.5"
-                    title="Vòng quay phim ngẫu nhiên thông minh"
+                    className="shrink-0 px-3.5 py-1.5 rounded-xl bg-[#E50914]/15 border border-[#E50914]/30 text-[#E50914] hover:bg-[#E50914]/25 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
+                    title="Gợi ý phim ngẫu nhiên thông minh"
                   >
-                    <span>🎲</span> Vòng Quay Phim
+                    <Sparkles className="w-3.5 h-3.5 text-[#E50914]" />
+                    <span>Gợi Ý Phim</span>
                   </button>
                 </div>
 

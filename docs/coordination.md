@@ -215,6 +215,11 @@ Kiểm tra thủ công bằng Chrome headless + CDP trên `vite preview`:
   - **Header & Thanh điều hướng Netflix Glass (`Navbar.tsx`, `NavbarLogo.tsx`, `DesktopNav.tsx`):**
     - Thanh điều hướng tự động chuyển đổi hiệu ứng: trong suốt khi ở đầu trang (`scrollY <= 20`) và chuyển sang kính mờ tối màu sang trọng (`bg-[#141414]/95 backdrop-blur-md border-b border-white/[0.08]`) khi cuộn xuống.
     - **Loại bỏ nút Bảng Màu (Theme Selector):** Gỡ bỏ hoàn toàn nút Palette gây hiểu nhầm khỏi thanh Header và Mobile Drawer để tinh gọn giao diện, cố định bản sắc thương hiệu Đỏ Netflix & Đen Điện Ảnh thống nhất 100%.
+    - **Nâng cấp & Sửa lỗi toàn diện tính năng Gợi Ý Phim Ngẫu Nhiên (`MovieRouletteModal.tsx`, `MobileBottomNav.tsx`):**
+      - Khắc phục triệt để lỗi React Hook cleanup làm kẹt vĩnh viễn ở trạng thái "Đang chuẩn bị danh sách phim..."; xây dựng cơ chế tráo phim với thuật toán giảm tốc vật lý (ease-out deceleration, 14 bước từ 50ms đến 290ms trong ~1s) mượt mà và dừng đúng lúc.
+      - Thiết kế lại giao diện chuẩn điện ảnh Netflix: nền tối `#181818`, thẻ kết quả hiển thị poster lớn bo góc, tỉ lệ phù hợp `% Phù hợp` xanh lá, badge chất lượng `HD` đỏ.
+      - Bộ 3 nút hành động tiện lợi: Nút trắng chữ đen `Xem Phim`, nút kính mờ `Chi Tiết`, nút `Đổi Phim` quay tiếp 1-chạm.
+      - Đồng bộ nút bấm trên thanh di động `MobileBottomNav` (nhãn "Ngẫu Nhiên", icon `Sparkles`, điểm nhấn đỏ Netflix).
   - **Kiểm thử & Chất lượng:**
     - Đạt 76/76 tests Vitest frontend, `oxlint` 0 lỗi, TypeScript typecheck sạch sẽ, bundle production build hoàn tất an toàn.
 

@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { X, Sparkles, Dices, Play, Info, Star, Calendar, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { X, Sparkles, Play, Info, Calendar, RefreshCw, Film } from 'lucide-react';
 import type { MovieItem } from '@/shared/types';
 import { getImageUrl, formatMovieTitle } from '@/shared/api';
 
@@ -21,11 +21,12 @@ export const MovieRouletteModal: React.FC<Props> = ({
   const [selectedGenre, setSelectedGenre] = useState<string>('all');
   const [isSpinning, setIsSpinning] = useState(false);
   const [currentMovie, setCurrentMovie] = useState<MovieItem | null>(null);
-  const [hasSpun, setHasSpun] = useState(false);
+
   const spinTimerRef = useRef<number | null>(null);
+  const spinActiveRef = useRef<boolean>(false);
 
   // Extract unique genres from available movies
-  const availableGenres = React.useMemo(() => {
+  const availableGenres = useMemo(() => {
     const map = new Map<string, string>();
     for (const m of movies) {
       if (m.category) {
@@ -34,114 +35,160 @@ export const MovieRouletteModal: React.FC<Props> = ({
         }
       }
     }
-    return Array.from(map.entries()).map(([slug, name]) => ({ slug, name }));
+    return Array.from(map.entries())
+      .map(([slug, name]) => ({ slug, name }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'vi'));
   }, [movies]);
 
   // Filter movies by genre
-  const filteredPool = React.useMemo(() => {
+  const filteredPool = useMemo(() => {
     if (selectedGenre === 'all') return movies;
     return movies.filter((m) =>
-      m.category?.some((c) => c.slug === selectedGenre || c.name.toLowerCase() === selectedGenre.toLowerCase())
+      m.category?.some(
+        (c) => c.slug === selectedGenre || c.name.toLowerCase() === selectedGenre.toLowerCase()
+      )
     );
   }, [movies, selectedGenre]);
 
-  const handleSpin = React.useCallback(() => {
-    if (filteredPool.length === 0 || isSpinning) return;
+  // Physics-based ease-out shuffle function
+  const spin = useCallback((pool: MovieItem[]) => {
+    if (!pool || pool.length === 0 || spinActiveRef.current) return;
+    spinActiveRef.current = true;
     setIsSpinning(true);
-    setHasSpun(true);
 
-    let counter = 0;
-    const totalSteps = 16;
-    const intervalTime = 80;
+    if (spinTimerRef.current) {
+      window.clearTimeout(spinTimerRef.current);
+      spinTimerRef.current = null;
+    }
 
-    if (spinTimerRef.current) window.clearInterval(spinTimerRef.current);
+    const totalSteps = 14;
+    let step = 0;
 
-    spinTimerRef.current = window.setInterval(() => {
-      counter++;
-      const randomIdx = Math.floor(Math.random() * filteredPool.length);
-      setCurrentMovie(filteredPool[randomIdx]);
+    const tick = () => {
+      step++;
+      const randomIdx = Math.floor(Math.random() * pool.length);
+      setCurrentMovie(pool[randomIdx]);
 
-      if (counter >= totalSteps) {
-        if (spinTimerRef.current) {
-          window.clearInterval(spinTimerRef.current);
-          spinTimerRef.current = null;
-        }
-        // Prioritize a well-rated movie or final random
-        const candidatePool = filteredPool.filter((m) => (m.tmdb?.vote_average || 0) >= 6);
-        const finalPool = candidatePool.length > 3 ? candidatePool : filteredPool;
+      if (step >= totalSteps) {
+        // Prioritize a well-rated movie or pick random from the pool
+        const candidatePool = pool.filter((m) => (m.tmdb?.vote_average || 0) >= 6.5);
+        const finalPool = candidatePool.length >= 3 ? candidatePool : pool;
         const finalPick = finalPool[Math.floor(Math.random() * finalPool.length)];
+
         setCurrentMovie(finalPick);
         setIsSpinning(false);
-      }
-    }, intervalTime);
-  }, [filteredPool, isSpinning]);
-
-  useEffect(() => {
-    let timeoutId: number | null = null;
-    if (isOpen && !hasSpun && filteredPool.length > 0) {
-      timeoutId = window.setTimeout(() => {
-        handleSpin();
-      }, 50);
-    }
-    return () => {
-      if (timeoutId) window.clearTimeout(timeoutId);
-      if (spinTimerRef.current) {
-        window.clearInterval(spinTimerRef.current);
+        spinActiveRef.current = false;
         spinTimerRef.current = null;
+      } else {
+        // Deceleration ease-out curve (fast at start, slower at end)
+        const progress = step / totalSteps;
+        const delay = Math.round(50 + progress * progress * 240);
+        spinTimerRef.current = window.setTimeout(tick, delay);
       }
     };
-  }, [isOpen, hasSpun, filteredPool.length, handleSpin]);
+
+    tick();
+  }, []);
+
+  // Trigger spin when modal opens
+  useEffect(() => {
+    if (isOpen && movies.length > 0) {
+      const pool = selectedGenre === 'all'
+        ? movies
+        : movies.filter((m) =>
+            m.category?.some(
+              (c) => c.slug === selectedGenre || c.name.toLowerCase() === selectedGenre.toLowerCase()
+            )
+          );
+      const activePool = pool.length > 0 ? pool : movies;
+      spin(activePool);
+    }
+
+    return () => {
+      if (spinTimerRef.current) {
+        window.clearTimeout(spinTimerRef.current);
+        spinTimerRef.current = null;
+      }
+      spinActiveRef.current = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]); // Intentionally only trigger on modal open/close
+
+  const handleSelectGenre = (newGenre: string) => {
+    setSelectedGenre(newGenre);
+    const newPool = newGenre === 'all'
+      ? movies
+      : movies.filter((m) =>
+          m.category?.some(
+            (c) => c.slug === newGenre || c.name.toLowerCase() === newGenre.toLowerCase()
+          )
+        );
+    if (newPool.length > 0) {
+      spin(newPool);
+    }
+  };
+
+  const handleManualSpin = () => {
+    if (!isSpinning && filteredPool.length > 0) {
+      spin(filteredPool);
+    }
+  };
 
   if (!isOpen) return null;
 
   const title = currentMovie ? formatMovieTitle(currentMovie.name) : '';
+  const matchPercent = currentMovie?.tmdb?.vote_average
+    ? Math.min(99, Math.max(65, Math.round(currentMovie.tmdb.vote_average * 10)))
+    : null;
 
   return (
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="Vòng quay phim ngẫu nhiên"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-2xl animate-in fade-in duration-200"
+      aria-label="Gợi ý phim ngẫu nhiên"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-2xl animate-in fade-in duration-200"
     >
-      <div className="relative w-full max-w-lg rounded-3xl bg-[#0c0e17]/95 border border-amber-500/30 shadow-2xl shadow-amber-500/10 p-6 sm:p-7 flex flex-col items-center text-center overflow-hidden">
-        {/* Ambient Top Glow */}
-        <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-amber-500 via-rose-500 to-red-500" />
-        <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-64 h-64 bg-amber-500/15 rounded-full blur-3xl pointer-events-none" />
+      <div className="relative w-full max-w-md rounded-3xl bg-[#181818] border border-white/[0.1] shadow-[0_20px_60px_rgba(0,0,0,0.8)] p-5 sm:p-6 flex flex-col items-center text-center overflow-hidden">
+        {/* Ambient Top Glow (Netflix Red) */}
+        <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-transparent via-[#E50914] to-transparent" />
+        <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-64 h-64 bg-[#E50914]/15 rounded-full blur-3xl pointer-events-none" />
 
         {/* Header */}
-        <div className="w-full flex items-center justify-between pb-4 mb-4 border-b border-white/[0.08]">
-          <div className="flex items-center gap-2">
-            <div className="p-2 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400">
-              <Dices className="w-5 h-5 animate-pulse" />
+        <div className="w-full flex items-center justify-between pb-3.5 mb-3.5 border-b border-white/[0.08]">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-[#E50914]/15 border border-[#E50914]/30 text-[#E50914] flex items-center justify-center shrink-0">
+              <Sparkles className="w-4 h-4" />
             </div>
             <div className="text-left">
-              <h2 className="text-base sm:text-lg font-black font-heading text-white tracking-tight flex items-center gap-1.5">
-                Vòng Quay Điện Ảnh
-                <Sparkles className="w-4 h-4 text-amber-400" />
+              <h2 className="text-sm sm:text-base font-extrabold font-heading text-white tracking-tight flex items-center gap-1.5">
+                Gợi Ý Phim Bất Ngờ
               </h2>
-              <p className="text-[11px] sm:text-xs text-zinc-400">
-                Không biết xem gì? Hãy để CineHub chọn cho bạn!
+              <p className="text-[11px] text-zinc-400">
+                Để CineHub chọn bộ phim hoàn hảo cho bạn!
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
             type="button"
-            className="w-9 h-9 rounded-full bg-white/[0.06] hover:bg-white/[0.12] text-zinc-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
-            aria-label="Đóng vòng quay"
+            className="w-8 h-8 rounded-full bg-white/[0.06] hover:bg-white/[0.15] text-zinc-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+            aria-label="Đóng gợi ý phim"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Genre Selector */}
-        <div className="w-full flex items-center justify-between gap-2 mb-4 bg-white/[0.03] p-2 rounded-2xl border border-white/[0.06]">
-          <span className="text-xs font-bold text-zinc-300 pl-2 shrink-0">Thể loại:</span>
+        {/* Genre Filter */}
+        <div className="w-full flex items-center justify-between gap-2 mb-3.5 bg-black/40 px-3 py-2 rounded-xl border border-white/[0.06]">
+          <span className="text-xs font-bold text-zinc-300 flex items-center gap-1.5 shrink-0">
+            <Film className="w-3.5 h-3.5 text-[#E50914]" />
+            Thể loại:
+          </span>
           <select
             value={selectedGenre}
-            onChange={(e) => setSelectedGenre(e.target.value)}
+            onChange={(e) => handleSelectGenre(e.target.value)}
             disabled={isSpinning}
-            className="px-3 py-1.5 text-xs bg-black/40 border border-white/10 rounded-xl text-white focus:outline-none focus:border-amber-400 cursor-pointer disabled:opacity-50"
+            className="px-2.5 py-1 text-xs bg-[#222] border border-white/10 rounded-lg text-white focus:outline-none focus:border-[#E50914] cursor-pointer disabled:opacity-50"
           >
             <option value="all">Tất cả thể loại ({movies.length})</option>
             {availableGenres.map((g) => (
@@ -152,29 +199,38 @@ export const MovieRouletteModal: React.FC<Props> = ({
           </select>
         </div>
 
-        {/* Movie Roulette Card */}
+        {/* Movie Shuffle Preview Card */}
         {currentMovie ? (
           <div
-            className={`w-full flex flex-col items-center my-2 p-4 rounded-2xl bg-white/[0.03] border transition-all duration-300 ${
+            className={`w-full flex flex-col items-center p-3.5 rounded-2xl bg-black/30 border transition-all duration-300 ${
               isSpinning
-                ? 'border-white/10 scale-95 opacity-80 blur-[0.5px]'
-                : 'border-amber-500/40 shadow-xl shadow-amber-500/10 scale-100 opacity-100'
+                ? 'border-white/10 scale-95 opacity-80 blur-[0.4px]'
+                : 'border-[#E50914]/40 shadow-xl shadow-[#E50914]/10 scale-100 opacity-100'
             }`}
           >
-            <div className="relative aspect-[2/3] w-36 sm:w-44 rounded-2xl overflow-hidden shadow-2xl border border-white/10 mb-3.5">
+            {/* Poster with Netflix Badges */}
+            <div className="relative aspect-[2/3] w-36 sm:w-40 rounded-xl overflow-hidden shadow-2xl border border-white/10 mb-3">
               <img
                 src={getImageUrl(currentMovie.poster_url || currentMovie.thumb_url)}
                 alt={title}
                 className="w-full h-full object-cover"
+                loading="eager"
               />
-              {currentMovie.tmdb?.vote_average ? (
-                <div className="absolute top-2 right-2 px-2 py-0.5 rounded-lg bg-black/80 backdrop-blur-md border border-amber-500/40 text-amber-400 font-black text-xs flex items-center gap-1 shadow-lg">
-                  <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                  {currentMovie.tmdb.vote_average.toFixed(1)}
+
+              {/* Match Score Badge (Netflix Green) */}
+              {matchPercent && (
+                <div className="absolute top-2 right-2 px-2 py-0.5 rounded bg-black/80 backdrop-blur-md border border-[#46d369]/40 text-[#46d369] font-black text-[11px] shadow-lg">
+                  {matchPercent}% Phù hợp
                 </div>
-              ) : null}
+              )}
+
+              {/* Quality Badge */}
+              <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-[#E50914] text-white font-black text-[9px] uppercase tracking-wider shadow-md">
+                {currentMovie.quality || 'HD'}
+              </div>
             </div>
 
+            {/* Title & Metadata */}
             <h3 className="text-base sm:text-lg font-black text-white font-heading truncate max-w-full px-2">
               {title}
             </h3>
@@ -184,68 +240,74 @@ export const MovieRouletteModal: React.FC<Props> = ({
               </p>
             )}
 
-            <div className="flex items-center gap-2 mt-2 text-xs text-zinc-300">
+            <div className="flex items-center gap-2 mt-2 text-xs text-zinc-300 flex-wrap justify-center">
               {currentMovie.year && (
                 <span className="flex items-center gap-1 font-semibold text-zinc-400">
                   <Calendar className="w-3.5 h-3.5" />
                   {currentMovie.year}
                 </span>
               )}
-              {currentMovie.quality && (
-                <span className="px-1.5 py-0.5 rounded bg-red-600/80 text-white font-bold text-[10px]">
-                  {currentMovie.quality}
-                </span>
-              )}
               {currentMovie.episode_current && (
-                <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold text-[10px] border border-amber-500/30">
+                <span className="px-2 py-0.5 rounded bg-white/[0.08] text-zinc-300 font-bold text-[11px]">
                   {currentMovie.episode_current}
                 </span>
               )}
             </div>
           </div>
         ) : (
-          <div className="py-16 text-center text-zinc-400 text-xs">
-            Đang chuẩn bị danh sách phim...
+          <div className="py-14 text-center text-zinc-400 text-xs">
+            {filteredPool.length === 0
+              ? 'Không có phim phù hợp trong thể loại này.'
+              : 'Đang chuẩn bị danh sách phim...'}
           </div>
         )}
 
         {/* Action Controls */}
-        <div className="w-full flex items-center justify-center gap-2.5 mt-2 flex-wrap">
-          <button
-            type="button"
-            onClick={handleSpin}
-            disabled={isSpinning || filteredPool.length === 0}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 text-black font-black text-xs sm:text-sm cursor-pointer shadow-lg shadow-amber-500/20 hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
-          >
-            <RefreshCw className={`w-4 h-4 ${isSpinning ? 'animate-spin' : ''}`} />
-            <span>{isSpinning ? 'Đang quay...' : 'Quay Lại Lần Nữa'}</span>
-          </button>
-
-          {currentMovie && !isSpinning && (
+        <div className="w-full flex items-center justify-center gap-2 mt-4 flex-wrap">
+          {isSpinning ? (
+            <div className="flex items-center gap-2 px-6 py-2.5 rounded-lg bg-white/10 text-zinc-300 font-bold text-xs sm:text-sm">
+              <RefreshCw className="w-4 h-4 animate-spin text-[#E50914]" />
+              <span>Đang chọn phim...</span>
+            </div>
+          ) : (
             <>
-              {onWatchMovie && (
+              {currentMovie && onWatchMovie && (
                 <button
                   type="button"
                   onClick={() => {
                     onClose();
                     onWatchMovie(currentMovie.slug);
                   }}
-                  className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-black text-xs sm:text-sm cursor-pointer shadow-lg shadow-red-600/30 hover:scale-105 active:scale-95 transition-all"
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-white hover:bg-white/85 text-black font-extrabold text-xs sm:text-sm cursor-pointer shadow-xl transition-transform active:scale-95"
                 >
                   <Play className="w-4 h-4 fill-current" />
                   <span>Xem Phim</span>
                 </button>
               )}
+
+              {currentMovie && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onSelectMovie(currentMovie.slug);
+                  }}
+                  className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg bg-zinc-700/80 hover:bg-zinc-700 text-white font-bold text-xs sm:text-sm cursor-pointer backdrop-blur-md transition-transform active:scale-95"
+                >
+                  <Info className="w-4 h-4 text-zinc-300" />
+                  <span>Chi Tiết</span>
+                </button>
+              )}
+
               <button
                 type="button"
-                onClick={() => {
-                  onClose();
-                  onSelectMovie(currentMovie.slug);
-                }}
-                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl glass-pill hover:bg-white/15 text-zinc-200 hover:text-white font-bold text-xs sm:text-sm cursor-pointer border border-white/10 transition-all"
+                onClick={handleManualSpin}
+                disabled={filteredPool.length === 0}
+                className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-lg border border-white/20 hover:border-white text-zinc-300 hover:text-white font-bold text-xs sm:text-sm cursor-pointer hover:bg-white/10 transition-all active:scale-95 disabled:opacity-50"
+                title="Đổi sang phim ngẫu nhiên khác"
               >
-                <Info className="w-4 h-4 text-zinc-400" />
-                <span>Chi Tiết</span>
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Đổi Phim</span>
               </button>
             </>
           )}

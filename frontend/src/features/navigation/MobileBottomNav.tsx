@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Film, Tv, Dices, Bookmark } from 'lucide-react';
+import { Home, Film, Tv, Sparkles, Bookmark } from 'lucide-react';
 
 interface Props {
   activeTab: string;
@@ -35,8 +35,8 @@ export const MobileBottomNav: React.FC<Props> = React.memo(({
     },
     {
       id: 'roulette',
-      label: 'Vòng Quay',
-      icon: Dices,
+      label: 'Ngẫu Nhiên',
+      icon: Sparkles,
       action: triggerRoulette,
       isActive: false,
       isSpecial: true,
@@ -61,7 +61,7 @@ export const MobileBottomNav: React.FC<Props> = React.memo(({
   return (
     <nav
       aria-label="Điều hướng di động nhanh"
-      className="fixed bottom-0 inset-x-0 z-40 md:hidden bg-[#090a0f]/92 backdrop-blur-2xl border-t border-white/[0.1] shadow-[0_-10px_35px_rgba(0,0,0,0.7)] px-2 pt-1.5 pb-[max(0.6rem,env(safe-area-inset-bottom,0px))]"
+      className="fixed bottom-0 inset-x-0 z-40 md:hidden bg-[#141414]/95 backdrop-blur-2xl border-t border-white/[0.08] shadow-[0_-10px_35px_rgba(0,0,0,0.8)] px-2 pt-1.5 pb-[max(0.6rem,env(safe-area-inset-bottom,0px))]"
     >
       <div className="flex items-center justify-around max-w-lg mx-auto">
         {navItems.map((item) => {
@@ -73,9 +73,9 @@ export const MobileBottomNav: React.FC<Props> = React.memo(({
               onClick={item.action}
               className={`relative flex flex-col items-center justify-center py-1 px-2 rounded-2xl min-h-[48px] min-w-[54px] transition-all duration-200 cursor-pointer active:scale-95 ${
                 item.isActive
-                  ? 'text-red-500 font-black'
+                  ? 'text-[#E50914] font-black'
                   : item.isSpecial
-                  ? 'text-amber-400 hover:text-amber-300 font-bold'
+                  ? 'text-[#E50914] font-bold'
                   : 'text-zinc-400 hover:text-zinc-200 font-medium'
               }`}
               aria-current={item.isActive ? 'page' : undefined}
@@ -84,9 +84,9 @@ export const MobileBottomNav: React.FC<Props> = React.memo(({
               <div
                 className={`relative p-1 rounded-xl transition-all ${
                   item.isActive
-                    ? 'bg-red-500/15 shadow-sm shadow-red-500/30'
+                    ? 'bg-[#E50914]/15 shadow-sm shadow-[#E50914]/30'
                     : item.isSpecial
-                    ? 'bg-amber-500/15 border border-amber-500/30 shadow-sm shadow-amber-500/20 animate-pulse'
+                    ? 'bg-[#E50914]/15 border border-[#E50914]/35 shadow-sm shadow-[#E50914]/25'
                     : ''
                 }`}
               >
