@@ -1,7 +1,7 @@
 // CineHub service worker: app shell + API + image runtime caching.
 // Keep cache versions in sync with releases; old caches are removed on activate.
-const SHELL_CACHE = 'cinehub-shell-v5';
-const API_CACHE = 'cinehub-api-v3';
+const SHELL_CACHE = 'cinehub-shell-v6';
+const API_CACHE = 'cinehub-api-v4';
 const IMAGE_CACHE = 'cinehub-images-v1';
 const API_TTL_MS = 4 * 60 * 1000;
 const MAX_API_ENTRIES = 120;
@@ -113,7 +113,8 @@ async function handleNavigation(request) {
 
 async function handleApi(request) {
   const cache = await caches.open(API_CACHE);
-  const cached = await cache.match(request);
+  const bypassRead = request.cache === 'no-store';
+  const cached = bypassRead ? null : await cache.match(request);
 
   const network = fetch(request)
     .then(async (response) => {
@@ -139,7 +140,8 @@ async function handleApi(request) {
   if (response) return response;
 
   // Only fall back to an expired entry when the network is unavailable.
-  if (cached) return cached;
+  const fallbackCache = cached || (await cache.match(request));
+  if (fallbackCache) return fallbackCache;
 
   return new Response(JSON.stringify({ status: false, message: 'offline' }), {
     status: 503,

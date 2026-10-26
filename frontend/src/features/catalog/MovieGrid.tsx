@@ -10,6 +10,8 @@ import {
   Search,
   X,
   SlidersHorizontal,
+  Share2,
+  Check,
 } from 'lucide-react';
 
 interface Props {
@@ -23,7 +25,20 @@ interface Props {
   onSelectMovie: (m: MovieItem) => void;
   favorites: string[];
   onToggleFav: (m: MovieItem) => void;
+  initialSort?: SortKey;
+  initialYear?: string;
+  initialRating?: string;
+  onFacetChange?: (facets: { sort?: SortKey; year?: string; rating?: string }) => void;
 }
+
+export type SortKey =
+  | 'updated-desc'
+  | 'default'
+  | 'rating'
+  | 'votes'
+  | 'year-desc'
+  | 'year-asc'
+  | 'name';
 
 export const MovieGrid: React.FC<Props> = ({
   title,
@@ -36,19 +51,22 @@ export const MovieGrid: React.FC<Props> = ({
   onSelectMovie,
   favorites,
   onToggleFav,
+  initialSort,
+  initialYear,
+  initialRating,
+  onFacetChange,
 }) => {
   const [jumpPage, setJumpPage] = useState('');
   const [jumpError, setJumpError] = useState<string | null>(null);
-  const [selectedYear, setSelectedYear] = useState<string>('all');
-  const [selectedRating, setSelectedRating] = useState<string>('all');
+  const [selectedYear, setSelectedYear] = useState<string>(initialYear || 'all');
+  const [selectedRating, setSelectedRating] = useState<string>(initialRating || 'all');
   const [selectedGenre, setSelectedGenre] = useState<string>('all');
   const [selectedCountry, setSelectedCountry] = useState<string>('all');
   const [selectedLang, setSelectedLang] = useState<string>('all');
   const [selectedCinema, setSelectedCinema] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<
-    'default' | 'rating' | 'votes' | 'year-desc' | 'year-asc' | 'name'
-  >('default');
+  const [sortBy, setSortBy] = useState<SortKey>(initialSort || 'updated-desc');
   const [filterSearch, setFilterSearch] = useState('');
+  const [copiedFilter, setCopiedFilter] = useState(false);
 
   const availableYears = useMemo(() => {
     return Array.from(new Set(movies.map((m) => m.year).filter(Boolean))).sort(
@@ -87,7 +105,7 @@ export const MovieGrid: React.FC<Props> = ({
     selectedCountry !== 'all' ||
     selectedLang !== 'all' ||
     selectedCinema !== 'all' ||
-    sortBy !== 'default' ||
+    (sortBy !== 'updated-desc' && sortBy !== 'default') ||
     filterSearch.trim() !== '';
 
   const resetFilters = () => {
@@ -97,8 +115,9 @@ export const MovieGrid: React.FC<Props> = ({
     setSelectedCountry('all');
     setSelectedLang('all');
     setSelectedCinema('all');
-    setSortBy('default');
+    setSortBy('updated-desc');
     setFilterSearch('');
+    onFacetChange?.({ sort: 'updated-desc', year: 'all', rating: 'all' });
   };
 
   const displayedMovies = useMemo(() => {
@@ -159,22 +178,51 @@ export const MovieGrid: React.FC<Props> = ({
 
         return true;
       })
+      .map((item, index) => ({ item, index }))
       .sort((a, b) => {
+        if (sortBy === 'updated-desc' || sortBy === 'default') {
+          const timeA = a.item.updatedAt ? Date.parse(a.item.updatedAt) : NaN;
+          const timeB = b.item.updatedAt ? Date.parse(b.item.updatedAt) : NaN;
+          const hasA = !Number.isNaN(timeA);
+          const hasB = !Number.isNaN(timeB);
+
+          if (hasA && hasB) {
+            const diff = timeB - timeA;
+            if (diff !== 0) return diff;
+            return a.index - b.index;
+          }
+          if (hasA) return -1;
+          if (hasB) return 1;
+          return a.index - b.index;
+        }
         if (sortBy === 'rating') {
-          const rA = a.tmdb?.vote_average || 0;
-          const rB = b.tmdb?.vote_average || 0;
-          return rB - rA;
+          const rA = a.item.tmdb?.vote_average || 0;
+          const rB = b.item.tmdb?.vote_average || 0;
+          if (rB !== rA) return rB - rA;
+          return a.index - b.index;
         }
         if (sortBy === 'votes') {
-          const vA = a.tmdb?.vote_count || 0;
-          const vB = b.tmdb?.vote_count || 0;
-          return vB - vA;
+          const vA = a.item.tmdb?.vote_count || 0;
+          const vB = b.item.tmdb?.vote_count || 0;
+          if (vB !== vA) return vB - vA;
+          return a.index - b.index;
         }
-        if (sortBy === 'name') return a.name.localeCompare(b.name);
-        if (sortBy === 'year-desc') return (b.year || 0) - (a.year || 0);
-        if (sortBy === 'year-asc') return (a.year || 0) - (b.year || 0);
-        return 0;
-      });
+        if (sortBy === 'name') return a.item.name.localeCompare(b.item.name);
+        if (sortBy === 'year-desc') {
+          const yA = a.item.year || 0;
+          const yB = b.item.year || 0;
+          if (yB !== yA) return yB - yA;
+          return a.index - b.index;
+        }
+        if (sortBy === 'year-asc') {
+          const yA = a.item.year || 0;
+          const yB = b.item.year || 0;
+          if (yA !== yB) return yA - yB;
+          return a.index - b.index;
+        }
+        return a.index - b.index;
+      })
+      .map(({ item }) => item);
   }, [
     movies,
     selectedYear,
@@ -243,16 +291,37 @@ export const MovieGrid: React.FC<Props> = ({
             )}
           </div>
 
-          {/* Quick reset button on the right if active */}
-          {hasActiveFilters && (
+          {/* Quick reset button and share filter on the right if active */}
+          <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+            {hasActiveFilters && (
+              <button
+                onClick={resetFilters}
+                className="flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 font-bold px-3 py-1.5 rounded-xl bg-red-600/10 hover:bg-red-600/20 border border-red-500/30 transition-colors cursor-pointer"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                Xóa bộ lọc
+              </button>
+            )}
             <button
-              onClick={resetFilters}
-              className="self-start sm:self-auto flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 font-bold px-3 py-1.5 rounded-xl bg-red-600/10 hover:bg-red-600/20 border border-red-500/30 transition-colors cursor-pointer"
+              onClick={() => {
+                const url = new URL(window.location.href);
+                if (selectedYear !== 'all') url.searchParams.set('year', selectedYear);
+                else url.searchParams.delete('year');
+                if (selectedRating !== 'all') url.searchParams.set('rating', selectedRating);
+                else url.searchParams.delete('rating');
+                if (sortBy !== 'updated-desc' && sortBy !== 'default') url.searchParams.set('sort', sortBy);
+                else url.searchParams.delete('sort');
+                navigator.clipboard.writeText(url.toString());
+                setCopiedFilter(true);
+                setTimeout(() => setCopiedFilter(false), 2000);
+              }}
+              className="flex items-center gap-1.5 text-xs text-zinc-300 hover:text-white px-3 py-1.5 rounded-xl glass-pill hover:bg-white/15 border border-white/10 transition-colors cursor-pointer"
+              title="Sao chép liên kết bộ lọc đang chọn"
             >
-              <RotateCcw className="w-3.5 h-3.5" />
-              Xóa bộ lọc
+              {copiedFilter ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Share2 className="w-3.5 h-3.5 text-zinc-400" />}
+              <span>{copiedFilter ? 'Đã sao chép link' : 'Chia sẻ bộ lọc'}</span>
             </button>
-          )}
+          </div>
         </div>
 
         {/* Filter Controls Row */}
@@ -384,29 +453,26 @@ export const MovieGrid: React.FC<Props> = ({
               </span>
               <select
                 value={sortBy}
-                onChange={(e) =>
-                  setSortBy(
-                    e.target.value as
-                      | 'default'
-                      | 'rating'
-                      | 'votes'
-                      | 'year-desc'
-                      | 'year-asc'
-                      | 'name'
-                  )
-                }
+                onChange={(e) => setSortBy(e.target.value as SortKey)}
                 aria-label="Sắp xếp danh sách phim"
                 className="bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.1] rounded-xl px-2.5 py-1.5 text-white text-xs focus:outline-none focus:border-red-500 cursor-pointer transition-colors"
               >
-                <option value="default" className="bg-[#10121a]">Mới cập nhật</option>
+                <option value="updated-desc" className="bg-[#10121a]">Mới cập nhật</option>
                 <option value="rating" className="bg-[#10121a]">⭐ Điểm TMDB cao nhất</option>
                 <option value="votes" className="bg-[#10121a]">🔥 Đánh giá nhiều nhất</option>
-                <option value="year-desc" className="bg-[#10121a]">📅 Năm mới nhất</option>
+                <option value="year-desc" className="bg-[#10121a]">📅 Năm phát hành mới nhất</option>
                 <option value="year-asc" className="bg-[#10121a]">⏳ Năm cũ nhất</option>
                 <option value="name" className="bg-[#10121a]">🔤 Tên A-Z</option>
               </select>
             </div>
           </div>
+        )}
+
+        {/* Client-side sort notice */}
+        {!loading && movies.length > 0 && (
+          <p className="text-[11px] text-zinc-400/80 italic pl-1">
+            * Ghi chú: Sắp xếp client-side chỉ áp dụng cho 24 phim trên trang này. Muốn sắp xếp toàn bộ danh mục cần backend sort.
+          </p>
         )}
 
         {/* Active Filter Chips */}
@@ -495,20 +561,20 @@ export const MovieGrid: React.FC<Props> = ({
                 </button>
               </span>
             )}
-            {sortBy !== 'default' && (
+            {sortBy !== 'updated-desc' && sortBy !== 'default' && (
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-white/10 border border-white/20 text-zinc-200 font-medium text-[11px]">
                 {sortBy === 'rating'
                   ? '⭐ Điểm TMDB'
                   : sortBy === 'votes'
                     ? '🔥 Đánh giá nhiều nhất'
                     : sortBy === 'year-desc'
-                      ? '📅 Năm mới nhất'
+                      ? '📅 Năm phát hành mới nhất'
                       : sortBy === 'year-asc'
                         ? '⏳ Năm cũ nhất'
                         : '🔤 Tên A-Z'}
                 <button
                   type="button"
-                  onClick={() => setSortBy('default')}
+                  onClick={() => setSortBy('updated-desc')}
                   className="hover:text-white ml-0.5 cursor-pointer"
                   title="Bỏ sắp xếp"
                 >

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  normalizeCollection,
+  normalizeCollections,
   normalizeFavorite,
   normalizeFavorites,
   normalizeHistoryItem,
@@ -89,5 +91,32 @@ describe('validation dữ liệu người dùng', () => {
 
     expect(normalized).toHaveLength(50);
     expect(normalized.filter((h) => h.episodeSlug === 'tap-0')).toHaveLength(1);
+  });
+
+  it('chuẩn hóa collection và dedupe theo id', () => {
+    expect(normalizeCollection({ id: '1', name: '' })).toBeNull();
+    expect(normalizeCollection(null)).toBeNull();
+
+    const col = normalizeCollection({
+      id: 'c1',
+      name: 'Hành động',
+      description: 'Phim hay',
+      slugs: ['dune', 'dune', 'avatar'],
+    });
+    expect(col).toMatchObject({
+      id: 'c1',
+      name: 'Hành động',
+      description: 'Phim hay',
+      slugs: ['dune', 'avatar'],
+    });
+
+    const cols = normalizeCollections([
+      { id: 'c1', name: 'Col 1', slugs: ['a'] },
+      { id: 'c1', name: 'Col 1 Trùng', slugs: ['b'] },
+      { id: 'c2', name: 'Col 2', slugs: ['c'] },
+    ]);
+    expect(cols).toHaveLength(2);
+    expect(cols[0].id).toBe('c1');
+    expect(cols[1].id).toBe('c2');
   });
 });

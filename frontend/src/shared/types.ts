@@ -34,6 +34,8 @@ export interface MovieItem {
   tmdb?: MovieTMDB;
   category?: MovieCategory[];
   country?: MovieCountry[];
+  updatedAt?: string;
+  modified?: { time?: string };
 }
 
 export interface EpisodeItem {
@@ -85,6 +87,14 @@ export interface FavoriteItem {
   quality?: string;
   lang?: string;
   savedAt: number;
+}
+
+export interface CustomCollection {
+  id: string;
+  name: string;
+  description?: string;
+  createdAt: number;
+  slugs: string[];
 }
 
 interface ApiPagination {

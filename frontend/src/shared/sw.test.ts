@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 const swSource = readFileSync(resolve(process.cwd(), 'public/sw.js'), 'utf8');
 
 type FetchListener = (event: {
-  request: { method: string; url: string; mode: string; destination: string };
+  request: { method: string; url: string; mode: string; destination: string; cache?: string };
   respondWith: (response: Promise<Response>) => void;
 }) => void;
 
@@ -30,7 +30,7 @@ function createHarness(cachedResponse?: Response) {
       deletedCaches.push(name);
       return true;
     }),
-    keys: vi.fn(async () => ['cinehub-shell-v5', 'cinehub-api-v2', 'other-cache']),
+    keys: vi.fn(async () => ['cinehub-shell-v6', 'cinehub-api-v3', 'other-cache']),
     match: vi.fn(async () => undefined),
     open: vi.fn(async () => cache),
   };
@@ -56,10 +56,13 @@ function createHarness(cachedResponse?: Response) {
 
   vm.runInContext(swSource, context);
 
-  const dispatchFetch = async (url = 'https://phimapi.com/test'): Promise<Response> => {
+  const dispatchFetch = async (
+    url = 'https://phimapi.com/test',
+    requestInit: { cache?: string } = {}
+  ): Promise<Response> => {
     const respondWith = vi.fn();
     (listeners.get('fetch') as FetchListener)({
-      request: { method: 'GET', url, mode: 'cors', destination: '' },
+      request: { method: 'GET', url, mode: 'cors', destination: '', ...requestInit },
       respondWith,
     });
     expect(respondWith).toHaveBeenCalledTimes(1);
@@ -103,6 +106,20 @@ describe('service worker api cache', () => {
     expect(harness.fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it('bypasses cache and fetches network when request cache is no-store', async () => {
+    const fresh = jsonResponse({ value: 'cached' });
+    const harness = createHarness(fresh);
+    harness.fetchMock.mockResolvedValue(jsonResponse({ value: 'bypass-fresh' }));
+
+    const response = await harness.dispatchFetch('https://phimapi.com/test', {
+      cache: 'no-store',
+    });
+
+    await expect(response.json()).resolves.toEqual({ value: 'bypass-fresh' });
+    expect(harness.fetchMock).toHaveBeenCalledTimes(1);
+    expect(harness.cache.put).toHaveBeenCalledTimes(1);
+  });
+
   it('clears the api cache when the page sends CLEAR_API_CACHE', async () => {
     const harness = createHarness();
     const messageListener = harness.listeners.get('message') as MessageListener | undefined;
@@ -113,7 +130,7 @@ describe('service worker api cache', () => {
     const clearPromise = waitUntil.mock.calls[0][0] as Promise<unknown>;
     await clearPromise;
 
-    expect(harness.deletedCaches).toContain('cinehub-api-v3');
+    expect(harness.deletedCaches).toContain('cinehub-api-v4');
   });
 
   it('routes backend /api/compat requests to api cache', async () => {

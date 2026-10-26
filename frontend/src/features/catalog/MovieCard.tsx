@@ -1,7 +1,7 @@
 import React from 'react';
-import { Play, Star, Bookmark } from 'lucide-react';
+import { Play, Star, Bookmark, Clock } from 'lucide-react';
 import type { MovieItem } from '@/shared/types';
-import { getImageUrl, prefetchMovieDetail, formatMovieTitle } from '@/shared/api';
+import { getImageUrl, prefetchMovieDetail, formatMovieTitle, formatUpdatedAtBadge } from '@/shared/api';
 
 interface Props {
   movie: MovieItem;
@@ -9,6 +9,7 @@ interface Props {
   onQuickPlay?: () => void;
   isFav?: boolean;
   onToggleFav?: () => void;
+  showUpdatedAt?: boolean;
 }
 
 export const MovieCard: React.FC<Props> = React.memo(({
@@ -17,6 +18,7 @@ export const MovieCard: React.FC<Props> = React.memo(({
   onQuickPlay,
   isFav,
   onToggleFav,
+  showUpdatedAt,
 }) => {
   const [imgError, setImgError] = React.useState(false);
   const prefetchTimerRef = React.useRef<number | null>(null);
@@ -90,8 +92,20 @@ export const MovieCard: React.FC<Props> = React.memo(({
 
         {/* Episode current badge */}
         {movie.episode_current && (
-          <div className="absolute bottom-2.5 left-2.5 px-2 py-0.5 rounded-md text-[11px] font-bold bg-black/80 backdrop-blur-md text-amber-300 border border-amber-500/30 shadow-sm z-10 pointer-events-none">
+          <div className="absolute bottom-2.5 left-2.5 max-w-[48%] truncate px-2 py-0.5 rounded-md text-[11px] font-bold bg-black/80 backdrop-blur-md text-amber-300 border border-amber-500/30 shadow-sm z-10 pointer-events-none">
             {movie.episode_current}
+          </div>
+        )}
+
+        {/* Updated at badge */}
+        {showUpdatedAt && movie.updatedAt && (
+          <div
+            className="absolute bottom-2.5 right-2.5 max-w-[50%] truncate px-2 py-0.5 rounded-md text-[10px] font-bold bg-black/85 backdrop-blur-md text-emerald-300 border border-emerald-500/30 shadow-sm z-10 pointer-events-none flex items-center gap-1"
+            title={`Cập nhật lúc ${new Date(movie.updatedAt).toLocaleString('vi-VN')}`}
+            aria-label={`Cập nhật lúc ${new Date(movie.updatedAt).toLocaleString('vi-VN')}`}
+          >
+            <Clock className="w-2.5 h-2.5 shrink-0 text-emerald-400" />
+            <span className="truncate">{formatUpdatedAtBadge(movie.updatedAt)}</span>
           </div>
         )}
       </div>
@@ -149,7 +163,7 @@ export const MovieCard: React.FC<Props> = React.memo(({
           )}
         </div>
         <div className="flex items-center justify-between text-[11px] text-zinc-400 pt-1 border-t border-white/[0.05]">
-          <span className="font-semibold text-zinc-400">{movie.year || '2026'}</span>
+          <span className="font-semibold text-zinc-400">{movie.year ? String(movie.year) : '—'}</span>
           {movie.tmdb?.vote_average ? (
             <span className="flex items-center gap-1 text-amber-400 font-bold">
               <Star className="w-3 h-3 fill-amber-400 text-amber-400" />

@@ -1,7 +1,9 @@
-import type { FavoriteItem, HistoryItem } from './types';
+import type { CustomCollection, FavoriteItem, HistoryItem } from './types';
 
 export const MAX_FAVORITES = 100;
 export const MAX_HISTORY = 50;
+export const MAX_COLLECTIONS = 30;
+export const MAX_COLLECTION_SLUGS = 100;
 
 function cleanString(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined;
@@ -120,6 +122,51 @@ export function normalizeHistoryList(
     const key = `${item.slug}\u0000${item.episodeSlug}`;
     if (seen.has(key)) continue;
     seen.add(key);
+    result.push(item);
+    if (result.length >= limit) break;
+  }
+  return result;
+}
+
+export function normalizeCollection(value: unknown): CustomCollection | null {
+  if (!value || typeof value !== 'object') return null;
+  const item = value as Record<string, unknown>;
+  const id = cleanString(item.id);
+  const name = cleanString(item.name);
+  if (!id || !name) return null;
+
+  const slugs: string[] = [];
+  if (Array.isArray(item.slugs)) {
+    for (const s of item.slugs) {
+      const slugStr = cleanString(s);
+      if (slugStr && !slugs.includes(slugStr)) {
+        slugs.push(slugStr);
+        if (slugs.length >= MAX_COLLECTION_SLUGS) break;
+      }
+    }
+  }
+
+  return {
+    id,
+    name,
+    description: cleanString(item.description),
+    createdAt: cleanNumber(item.createdAt) ?? Date.now(),
+    slugs,
+  };
+}
+
+export function normalizeCollections(
+  value: unknown,
+  limit = MAX_COLLECTIONS
+): CustomCollection[] {
+  if (!Array.isArray(value)) return [];
+
+  const result: CustomCollection[] = [];
+  const seen = new Set<string>();
+  for (const entry of value) {
+    const item = normalizeCollection(entry);
+    if (!item || seen.has(item.id)) continue;
+    seen.add(item.id);
     result.push(item);
     if (result.length >= limit) break;
   }

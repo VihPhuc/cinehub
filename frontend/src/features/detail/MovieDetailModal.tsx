@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
 import DOMPurify from 'dompurify';
-import { X, Play, Bookmark, Star, Calendar, Clock, Loader2, Share2, Check, Video, Users, User, AlertCircle, RefreshCw, QrCode, Smartphone } from 'lucide-react';
+import { X, Play, Bookmark, Star, Calendar, Clock, Loader2, Share2, Check, Video, Users, User, AlertCircle, RefreshCw, QrCode, Smartphone, Search, FolderPlus, FolderCheck, Plus } from 'lucide-react';
 import type { MovieDetail, MovieItem } from '@/shared/types';
 import { getImageUrl, getMovieDetail, getGenreMovies, formatMovieTitle } from '@/shared/api';
-import { isEpisodeCompleted } from '@/shared/storage';
+import { isEpisodeCompleted, getCollections, toggleMovieInCollection, createCollection } from '@/shared/storage';
 
 function getYouTubeEmbedUrl(url?: string): string | null {
   if (!url) return null;
@@ -19,6 +19,7 @@ interface Props {
   isFav: boolean;
   onToggleFav: (m: MovieDetail) => void;
   onSelectSlug?: (newSlug: string) => void;
+  onSearchPerson?: (personName: string) => void;
 }
 
 export const MovieDetailModal: React.FC<Props> = ({
@@ -28,6 +29,7 @@ export const MovieDetailModal: React.FC<Props> = ({
   isFav,
   onToggleFav,
   onSelectSlug,
+  onSearchPerson,
 }) => {
   const [activeSlug, setActiveSlug] = useState(slug);
   const [movie, setMovie] = useState<MovieDetail | null>(null);
@@ -39,6 +41,14 @@ export const MovieDetailModal: React.FC<Props> = ({
   const [showQrModal, setShowQrModal] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [selectedServerIdx, setSelectedServerIdx] = useState(0);
+  const [showCollectionPicker, setShowCollectionPicker] = useState(false);
+  const [newCollectionName, setNewCollectionName] = useState('');
+  const [collections, setCollections] = useState(() => getCollections());
+  const movieSlug = movie?.slug;
+  const movieCollectionIds = useMemo(() => {
+    if (!movieSlug) return [];
+    return collections.filter((c) => c.slugs.includes(movieSlug)).map((c) => c.id);
+  }, [movieSlug, collections]);
 
   useEffect(() => {
     if (!showQrModal || !movie || qrDataUrl) return;
@@ -386,6 +396,26 @@ export const MovieDetailModal: React.FC<Props> = ({
               {copied ? 'Đã Sao Chép Link' : 'Chia Sẻ'}
             </button>
             <button
+              onClick={() => setShowCollectionPicker(!showCollectionPicker)}
+              className={`flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold border transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-amber-400 ${
+                movieCollectionIds.length > 0
+                  ? 'bg-amber-600/20 text-amber-300 border-amber-500/40 shadow-sm shadow-amber-500/20'
+                  : 'glass-pill text-zinc-200 border-white/10 hover:bg-white/15'
+              }`}
+              title="Thêm hoặc xóa phim khỏi Bộ sưu tập cá nhân"
+            >
+              {movieCollectionIds.length > 0 ? (
+                <FolderCheck className="w-4 h-4 text-amber-400" />
+              ) : (
+                <FolderPlus className="w-4 h-4 text-zinc-400" />
+              )}
+              <span>
+                {movieCollectionIds.length > 0
+                  ? `Trong ${movieCollectionIds.length} Bộ Sưu Tập`
+                  : 'Bộ Sưu Tập'}
+              </span>
+            </button>
+            <button
               onClick={() => setShowQrModal(true)}
               className="flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold border glass-pill text-amber-300 border-amber-500/30 hover:border-amber-500/60 hover:bg-amber-500/10 transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-amber-400"
               title="Quét mã QR để xem ngay trên điện thoại di động"
@@ -395,6 +425,95 @@ export const MovieDetailModal: React.FC<Props> = ({
               <span>Xem Trên Mobile (QR)</span>
             </button>
           </div>
+
+          {/* Collection Picker Popover */}
+          {showCollectionPicker && movie && (
+            <div className="p-4 rounded-2xl bg-white/[0.04] border border-amber-500/30 shadow-xl space-y-3 animate-in fade-in zoom-in-95">
+              <div className="flex items-center justify-between pb-2 border-b border-white/[0.08]">
+                <h4 className="text-xs font-bold text-amber-300 flex items-center gap-1.5 uppercase tracking-wider font-heading">
+                  <FolderPlus className="w-4 h-4 text-amber-400" /> Quản Lý Bộ Sưu Tập
+                </h4>
+                <button
+                  type="button"
+                  onClick={() => setShowCollectionPicker(false)}
+                  className="text-zinc-400 hover:text-white p-1 rounded-lg"
+                  aria-label="Đóng bảng bộ sưu tập"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {collections.length === 0 ? (
+                <p className="text-xs text-zinc-400">Bạn chưa có bộ sưu tập nào. Hãy tạo bên dưới:</p>
+              ) : (
+                <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                  {collections.map((col) => {
+                    const isInside = movieCollectionIds.includes(col.id);
+                    return (
+                      <button
+                        key={col.id}
+                        type="button"
+                        onClick={() => {
+                          toggleMovieInCollection(col.id, movie.slug);
+                          setCollections(getCollections());
+                        }}
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer transition-all border ${
+                          isInside
+                            ? 'bg-amber-500/15 border-amber-500/40 text-amber-200'
+                            : 'bg-white/[0.03] border-white/[0.06] text-zinc-300 hover:bg-white/[0.08]'
+                        }`}
+                      >
+                        <span className="truncate">{col.name}</span>
+                        {isInside ? (
+                          <Check className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                        ) : (
+                          <Plus className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-1">
+                <input
+                  type="text"
+                  value={newCollectionName}
+                  onChange={(e) => setNewCollectionName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && newCollectionName.trim()) {
+                      e.preventDefault();
+                      const created = createCollection(newCollectionName.trim());
+                      if (created) {
+                        toggleMovieInCollection(created.id, movie.slug);
+                        setCollections(getCollections());
+                        setNewCollectionName('');
+                      }
+                    }
+                  }}
+                  placeholder="Tên bộ sưu tập mới..."
+                  className="flex-1 px-3 py-1.5 text-xs bg-white/[0.06] border border-white/10 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-amber-400"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (newCollectionName.trim()) {
+                      const created = createCollection(newCollectionName.trim());
+                      if (created) {
+                        toggleMovieInCollection(created.id, movie.slug);
+                        setCollections(getCollections());
+                        setNewCollectionName('');
+                      }
+                    }
+                  }}
+                  disabled={!newCollectionName.trim()}
+                  className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-black font-bold text-xs rounded-xl cursor-pointer transition-all"
+                >
+                  Tạo
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Embedded Trailer Player */}
           {showTrailer && getYouTubeEmbedUrl(movie.trailer_url) && (
@@ -451,9 +570,20 @@ export const MovieDetailModal: React.FC<Props> = ({
                   </span>
                   <div className="flex flex-wrap gap-1.5">
                     {movie.director.map((d, i) => (
-                      <span key={i} className="px-2.5 py-1 rounded-lg glass-pill text-zinc-200 font-bold">
-                        {d}
-                      </span>
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => {
+                          onSearchPerson?.(d);
+                          onClose();
+                        }}
+                        className="group/btn flex items-center gap-1 px-2.5 py-1 rounded-lg glass-pill text-zinc-200 font-bold hover:bg-red-600 hover:text-white transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-red-400"
+                        title={`Tìm kiếm phim của đạo diễn ${d}`}
+                        aria-label={`Tìm phim của đạo diễn ${d}`}
+                      >
+                        <span>{d}</span>
+                        <Search className="w-3 h-3 text-zinc-400 group-hover/btn:text-white transition-colors" />
+                      </button>
                     ))}
                   </div>
                 </div>
@@ -463,11 +593,22 @@ export const MovieDetailModal: React.FC<Props> = ({
                   <span className="font-bold text-zinc-400 flex items-center gap-1 shrink-0 pt-1">
                     <Users className="w-3.5 h-3.5 text-red-500" /> Diễn viên:
                   </span>
-                  <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                  <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto pr-1">
                     {movie.actor.map((a, i) => (
-                      <span key={i} className="px-2.5 py-1 rounded-lg glass-pill text-zinc-300 font-medium">
-                        {a}
-                      </span>
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => {
+                          onSearchPerson?.(a);
+                          onClose();
+                        }}
+                        className="group/btn flex items-center gap-1 px-2.5 py-1 rounded-lg glass-pill text-zinc-300 font-medium hover:bg-red-600 hover:text-white transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-red-400"
+                        title={`Tìm kiếm phim của diễn viên ${a}`}
+                        aria-label={`Tìm phim của diễn viên ${a}`}
+                      >
+                        <span>{a}</span>
+                        <Search className="w-3 h-3 text-zinc-400 group-hover/btn:text-white transition-colors" />
+                      </button>
                     ))}
                   </div>
                 </div>
