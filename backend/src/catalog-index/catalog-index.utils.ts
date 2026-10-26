@@ -10,7 +10,11 @@ export const LANGUAGE_LABELS: Record<DiscoverLanguage, string> = {
 };
 
 export function normalizeText(value: string): string {
-  return value.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+  return value
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+    .replace(/đ/g, 'd');
 }
 
 export function languageKeys(lang: string | undefined): DiscoverLanguage[] {

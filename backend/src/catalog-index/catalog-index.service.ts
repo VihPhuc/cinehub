@@ -84,10 +84,7 @@ function toEntry(value: unknown): CatalogIndexEntry | null {
     : [];
   if (types.length === 0) return null;
 
-  const search =
-    typeof record.search === 'string'
-      ? record.search
-      : normalizeText([movie.name, movie.origin_name].filter(Boolean).join(' '));
+  const search = normalizeText([movie.name, movie.origin_name].filter(Boolean).join(' '));
 
   return { movie, types: [...new Set(types)], search };
 }
@@ -164,8 +161,10 @@ function sortValue(movie: MovieSummaryDto, sort: DiscoverSort): number | string 
     }
     case 'year':
       return movie.year;
-    case 'rating':
-      return movie.tmdb?.vote_average;
+    case 'rating': {
+      const rating = movie.tmdb?.vote_average;
+      return rating !== undefined && rating > 0 ? rating : undefined;
+    }
     case 'votes':
       return movie.tmdb?.vote_count;
     case 'name': {

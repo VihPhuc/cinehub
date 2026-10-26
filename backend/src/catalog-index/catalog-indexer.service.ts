@@ -47,8 +47,18 @@ function listItems(raw: UpstreamListResponse): UpstreamMovie[] {
 
 function pageCount(raw: UpstreamListResponse): number {
   const value = raw.pagination?.totalPages ?? raw.data?.params?.pagination?.totalPages;
-  if (typeof value !== 'number' || !Number.isFinite(value) || value < 1) return 1;
-  return Math.min(Math.floor(value), MAX_PAGES_PER_TYPE);
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 1) {
+    throw new Error('Upstream returned invalid pagination');
+  }
+  if (value > MAX_PAGES_PER_TYPE) {
+    throw new Error(`Upstream pagination exceeds ${MAX_PAGES_PER_TYPE} pages`);
+  }
+  return value;
+}
+
+function reportedTotalItems(raw: UpstreamListResponse): number | undefined {
+  const value = raw.pagination?.totalItems ?? raw.data?.params?.pagination?.totalItems;
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 }
 
 async function mapWithConcurrency<T, R>(
@@ -58,13 +68,20 @@ async function mapWithConcurrency<T, R>(
 ): Promise<R[]> {
   const results: R[] = [];
   let next = 0;
+  let failed = false;
   const workerCount = Math.min(Math.max(1, limit), items.length);
   const workers = Array.from({ length: workerCount }, async () => {
     for (;;) {
+      if (failed) return;
       const index = next;
       next += 1;
       if (index >= items.length) return;
-      results[index] = await worker(items[index]);
+      try {
+        results[index] = await worker(items[index]);
+      } catch (error) {
+        failed = true;
+        throw error;
+      }
     }
   });
   await Promise.all(workers);
@@ -114,7 +131,13 @@ export class CatalogIndexerService {
           `/v1/api/danh-sach/${type}`,
           { page: 1 }
         );
-        return { type, items: listItems(raw), totalPages: pageCount(raw) };
+        const items = listItems(raw);
+        const totalPages = pageCount(raw);
+        const totalItems = reportedTotalItems(raw);
+        if (items.length === 0 && totalItems !== undefined && totalItems > 0) {
+          throw new Error('Upstream returned an empty first page');
+        }
+        return { type, items, totalPages };
       }
     );
 

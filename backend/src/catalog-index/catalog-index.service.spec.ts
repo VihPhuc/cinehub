@@ -293,4 +293,66 @@ describe('CatalogIndexService', () => {
     await old.load();
     expect(old.getStatus().ready).toBe(false);
   });
+
+  it('treats a zero rating as missing in both directions', async () => {
+    const zeroPath = join(dir, 'zero-rating.json');
+    const zeroSnapshot: CatalogIndexSnapshot = {
+      version: 1,
+      generatedAt: '2026-10-26T04:00:00.000Z',
+      totalItems: 3,
+      entries: [
+        {
+          movie: { name: 'Zero', slug: 'zero', tmdb: { vote_average: 0, vote_count: 0 } },
+          types: ['phim-le'],
+          search: 'zero',
+        },
+        {
+          movie: { name: 'Six', slug: 'six', tmdb: { vote_average: 6, vote_count: 10 } },
+          types: ['phim-le'],
+          search: 'six',
+        },
+        {
+          movie: { name: 'Missing', slug: 'missing-rating' },
+          types: ['phim-le'],
+          search: 'missing rating',
+        },
+      ],
+    };
+    await writeFile(zeroPath, JSON.stringify(zeroSnapshot));
+    const zero = new CatalogIndexService(configWith(zeroPath));
+    await zero.load();
+
+    expect(slugs(zero.query({ page: 1, sort: 'rating', order: 'asc' }))).toEqual([
+      'six',
+      'zero',
+      'missing-rating',
+    ]);
+    expect(slugs(zero.query({ page: 1, sort: 'rating', order: 'desc' }))).toEqual([
+      'six',
+      'zero',
+      'missing-rating',
+    ]);
+  });
+
+  it('matches ASCII queries against Vietnamese đ titles', async () => {
+    const daoPath = join(dir, 'dao.json');
+    const daoSnapshot: CatalogIndexSnapshot = {
+      version: 1,
+      generatedAt: '2026-10-26T04:00:00.000Z',
+      totalItems: 1,
+      entries: [
+        { movie: { name: 'Đảo Ngọc', slug: 'dao-ngoc' }, types: ['phim-le'], search: 'stale' },
+      ],
+    };
+    await writeFile(daoPath, JSON.stringify(daoSnapshot));
+    const dao = new CatalogIndexService(configWith(daoPath));
+    await dao.load();
+
+    expect(slugs(dao.query({ page: 1, sort: 'updated', order: 'desc', q: 'dao ngoc' }))).toEqual([
+      'dao-ngoc',
+    ]);
+    expect(slugs(dao.query({ page: 1, sort: 'updated', order: 'desc', q: 'ĐẢO NGỌC' }))).toEqual([
+      'dao-ngoc',
+    ]);
+  });
 });

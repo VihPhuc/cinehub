@@ -178,4 +178,108 @@ describe('CatalogIndexerService', () => {
     await expect(service.refresh()).rejects.toThrow('invalid list payload');
     expect(await readFile(path, 'utf8')).toBe(oldContent);
   });
+
+  it('rejects a first page without pagination metadata and keeps the previous snapshot', async () => {
+    const oldContent = '{"old":true}';
+    await writeFile(path, oldContent);
+    const getJson = jest.fn(async () => ({ status: true, data: { items: [movieA] } }));
+    const service = new CatalogIndexerService(
+      { getJson } as unknown as PhimApiClient,
+      configWith(path)
+    );
+
+    await expect(service.refresh()).rejects.toThrow('pagination');
+    expect(await readFile(path, 'utf8')).toBe(oldContent);
+  });
+
+  it('rejects an empty first page when upstream reports items', async () => {
+    const oldContent = '{"old":true}';
+    await writeFile(path, oldContent);
+    const getJson = jest.fn(async () => ({
+      status: true,
+      data: {
+        items: [],
+        params: {
+          pagination: { currentPage: 1, totalPages: 1, totalItems: 24, totalItemsPerPage: 24 },
+        },
+      },
+    }));
+    const service = new CatalogIndexerService(
+      { getJson } as unknown as PhimApiClient,
+      configWith(path)
+    );
+
+    await expect(service.refresh()).rejects.toThrow('empty first page');
+    expect(await readFile(path, 'utf8')).toBe(oldContent);
+  });
+
+  it('rejects a page count above the crawl limit instead of truncating', async () => {
+    const getJson = jest.fn(async (requestPath: string) =>
+      requestPath === '/v1/api/danh-sach/phim-le'
+        ? {
+            status: true,
+            data: {
+              items: [movieA],
+              params: {
+                pagination: {
+                  currentPage: 1,
+                  totalPages: 6000,
+                  totalItems: 144000,
+                  totalItemsPerPage: 24,
+                },
+              },
+            },
+          }
+        : page([])
+    );
+    const service = new CatalogIndexerService(
+      { getJson } as unknown as PhimApiClient,
+      configWith(path)
+    );
+
+    await expect(service.refresh()).rejects.toThrow('pagination');
+  });
+
+  it('normalizes Vietnamese đ in the stored search text', async () => {
+    const dao = {
+      _id: 'd',
+      name: 'Đảo Ngọc',
+      origin_name: 'Đảo',
+      slug: 'dao-ngoc',
+      year: 2024,
+      modified: { time: '2026-10-20T00:00:00.000Z' },
+    };
+    const getJson = jest.fn(async (requestPath: string) =>
+      requestPath === '/v1/api/danh-sach/phim-le' ? page([dao]) : page([])
+    );
+    const service = new CatalogIndexerService(
+      { getJson } as unknown as PhimApiClient,
+      configWith(path)
+    );
+
+    await service.refresh();
+    const snapshot = await readSnapshot(path);
+    expect(snapshot.entries[0].search).toBe('dao ngoc dao');
+  });
+
+  it('stops pulling new pages after the first crawl failure', async () => {
+    let calls = 0;
+    const getJson = jest.fn(async (requestPath: string, query: { page?: number }) => {
+      calls += 1;
+      if (requestPath === '/v1/api/danh-sach/phim-le' && query.page === 2) {
+        throw new Error('upstream failed');
+      }
+      if (requestPath === '/v1/api/danh-sach/phim-le') {
+        return page([movieA], 20, query.page ?? 1);
+      }
+      return page([movieB]);
+    });
+    const service = new CatalogIndexerService(
+      { getJson } as unknown as PhimApiClient,
+      configWith(path, 2)
+    );
+
+    await expect(service.refresh()).rejects.toThrow('upstream failed');
+    expect(calls).toBe(6);
+  });
 });
